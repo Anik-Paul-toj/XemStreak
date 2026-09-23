@@ -51,12 +51,12 @@ class TreeStateModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
-    stage_level = Column(Integer, default=14) # Level 1 to 22 (Young Tree = 14)
-    total_leaves = Column(Integer, default=142)
-    leaves_today = Column(Integer, default=3)
-    xp = Column(Integer, default=4200)
-    pot_type = Column(String, default="terracotta")
-    flora_type = Column(String, default="sakura_blossom")
+    stage_level = Column(Integer, default=1) # Level 1 to 22 (starts at Level 1 Seed)
+    total_leaves = Column(Integer, default=0)
+    leaves_today = Column(Integer, default=0)
+    xp = Column(Integer, default=0)
+    pot_type = Column(String, default="none")
+    flora_type = Column(String, default="none")
     aura_type = Column(String, default="none")
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
@@ -67,9 +67,9 @@ class StreakModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
-    current_streak = Column(Integer, default=12)
-    longest_streak = Column(Integer, default=19)
-    total_study_days = Column(Integer, default=48)
+    current_streak = Column(Integer, default=0)
+    longest_streak = Column(Integer, default=0)
+    total_study_days = Column(Integer, default=0)
     last_study_date = Column(String, nullable=True) # YYYY-MM-DD
     updated_at = Column(DateTime, default=datetime.datetime.utcnow)
 
