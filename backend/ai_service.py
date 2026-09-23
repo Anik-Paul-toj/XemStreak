@@ -1,6 +1,10 @@
 import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
 
 class AIProvider(ABC):
     @abstractmethod
@@ -53,22 +57,40 @@ class GroqProvider(AIProvider):
 
         system_prompt = (
             "You are XemStreak's calm, motivating, and concise AI Study Companion. "
+            "You are not a generic chatbot. You care deeply about the user's deep work, calm study habits, and streak consistency. "
             f"Context: Username: {user_context.get('username')}, Streak: {user_context.get('streak')} days, "
             f"Today's Study Time: {user_context.get('today_minutes')} min, "
             f"Tree Stage: Level {user_context.get('tree_level')} of 22 ({user_context.get('tree_name')}). "
+            f"Active Room: {user_context.get('room_name') or 'Solo Garden'}. "
             "Keep answers concise (under 3 sentences), encouraging consistency over grind."
         )
 
-        chat_completion = self.client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=250,
-        )
-        return chat_completion.choices[0].message.content.strip()
+        # Candidate models supported by Groq API
+        models_to_try = [
+            "openai/gpt-oss-120b",
+            "qwen/qwen3.8-27b",
+            "openai/gpt-oss-20b",
+            "llama-3.3-70b-versatile"
+        ]
+
+        last_err = None
+        for model_name in models_to_try:
+            try:
+                chat_completion = self.client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    model=model_name,
+                    temperature=0.7,
+                    max_tokens=250,
+                )
+                return chat_completion.choices[0].message.content.strip()
+            except Exception as err:
+                last_err = err
+                continue
+
+        raise last_err or RuntimeError("Failed to generate response from Groq")
 
 class ContextualCompanionProvider(AIProvider):
     """
@@ -77,11 +99,11 @@ class ContextualCompanionProvider(AIProvider):
     """
     def generate_response(self, prompt: str, user_context: Dict[str, Any]) -> str:
         p_lower = prompt.lower()
-        streak = user_context.get("streak", 12)
-        today_mins = user_context.get("today_minutes", 102)
+        streak = user_context.get("streak", 0)
+        today_mins = user_context.get("today_minutes", 0)
         goal_mins = user_context.get("goal_minutes", 120)
-        tree_level = user_context.get("tree_level", 14)
-        tree_name = user_context.get("tree_name", "Young Tree")
+        tree_level = user_context.get("tree_level", 1)
+        tree_name = user_context.get("tree_name", "Seed")
         room_name = user_context.get("room_name")
 
         # Specific scenarios from Prompt.md Section 18
@@ -123,27 +145,36 @@ class ContextualCompanionProvider(AIProvider):
 
 class CompanionManager:
     def __init__(self):
+        self.reload_keys()
+
+    def reload_keys(self):
+        load_dotenv()
         self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.groq_key = os.getenv("GROQ_API_KEY")
 
-        if self.gemini_key:
+        if self.groq_key:
+            self.provider = GroqProvider(self.groq_key)
+            self.provider_name = "Groq AI"
+        elif self.gemini_key:
             self.provider = GeminiProvider(self.gemini_key)
             self.provider_name = "Gemini 2.5"
-        elif self.groq_key:
-            self.provider = GroqProvider(self.groq_key)
-            self.provider_name = "Groq LLaMA-3.3"
         else:
             self.provider = ContextualCompanionProvider()
             self.provider_name = "XemStreak Companion (Built-in)"
 
     def get_reply(self, message: str, user_context: Dict[str, Any]) -> Dict[str, str]:
+        # Refresh config in case key was updated
+        if not hasattr(self, 'provider') or not self.provider:
+            self.reload_keys()
+
         try:
             reply = self.provider.generate_response(message, user_context)
             return {"reply": reply, "provider": self.provider_name}
-        except Exception:
+        except Exception as e:
             # Graceful fallback to ContextualCompanionProvider
             fallback = ContextualCompanionProvider()
             reply = fallback.generate_response(message, user_context)
             return {"reply": reply, "provider": "XemStreak Companion (Fallback)"}
 
 companion_manager = CompanionManager()
+
