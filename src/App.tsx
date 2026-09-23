@@ -36,6 +36,7 @@ import { FloatingAICompanionButton } from './components/AICompanion/FloatingAICo
 import { AnalyticsModal } from './components/Analytics/AnalyticsModal';
 import { TreeRoomModal } from './components/PersonalSpace/TreeRoomModal';
 import { AuthModal } from './components/Auth/AuthModal';
+import { LandingPage } from './components/Landing/LandingPage';
 
 // Icons
 import { Play, Sparkles, Flame, Clock, Award, Bot, Compass } from 'lucide-react';
@@ -351,6 +352,28 @@ export function App() {
     setStreakData(updated);
     storageService.saveStreakData(updated);
   };
+
+  const isAuthenticated = Boolean((profile.id && profile.name !== 'Guest Learner') || api.getToken());
+
+  if (!isAuthenticated) {
+    return (
+      <>
+        <LandingPage
+          onOpenAuth={(mode) => {
+            setAuthModalMode(mode);
+            setIsAuthModalOpen(true);
+          }}
+          isBackendConnected={isBackendConnected}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
+          initialMode={authModalMode}
+        />
+      </>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
