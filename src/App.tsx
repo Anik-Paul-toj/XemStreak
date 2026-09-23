@@ -1,122 +1,546 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState } from 'react';
+import type {
+  TreeStage,
+  TreeState,
+  TreeCustomization,
+  StudyRoom,
+  CompletedSessionSummary,
+  StreakData,
+  UserProfile,
+  Milestone
+} from './types';
+import { storageService, calculateTreeStage } from './services/storage';
+import { useStudyTimer } from './hooks/useStudyTimer';
 
-function App() {
-  const [count, setCount] = useState(0)
+// Components
+import { Navbar } from './components/Navigation/Navbar';
+import { TreeDisplay } from './components/Tree/TreeDisplay';
+import { Card } from './components/UI/Card';
+import { Button } from './components/UI/Button';
+import { StatTile } from './components/UI/StatTile';
+import { ProgressBar } from './components/UI/ProgressBar';
+import { StreakCard } from './components/Streak/StreakCard';
+import { MilestonesModal } from './components/Streak/MilestonesModal';
+import { StudySetupModal } from './components/Study/StudySetupModal';
+import { ActiveStudySession } from './components/Study/ActiveStudySession';
+import { SessionCompleteModal } from './components/Study/SessionCompleteModal';
+import { RoomsSection } from './components/Rooms/RoomsSection';
+import { RoomDetailModal } from './components/Rooms/RoomDetailModal';
+import { CreateRoomModal } from './components/Rooms/CreateRoomModal';
+import { JoinPrivateModal } from './components/Rooms/JoinPrivateModal';
+
+// Icons
+import { Play, Sparkles, Flame, Clock, Award } from 'lucide-react';
+
+export function App() {
+  // Persistence state
+  const [profile, setProfile] = useState<UserProfile>(() => storageService.getProfile());
+  const [streakData, setStreakData] = useState<StreakData>(() => storageService.getStreakData());
+  const [customization, setCustomization] = useState<TreeCustomization>(() => storageService.getCustomization());
+  const [milestones, setMilestones] = useState<Milestone[]>(() => storageService.getMilestones());
+  const [rooms, setRooms] = useState<StudyRoom[]>(() => storageService.getRooms());
+
+  // Simulation state for testing Section 7 missed days
+  const [simulatedMissedDays, setSimulatedMissedDays] = useState(0);
+
+  // Modals state
+  const [isStudyModalOpen, setIsStudyModalOpen] = useState(false);
+  const [isMilestonesModalOpen, setIsMilestonesModalOpen] = useState(false);
+  const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<StudyRoom | null>(null);
+  const [privateRoomToUnlock, setPrivateRoomToUnlock] = useState<StudyRoom | null>(null);
+  const [completedSummary, setCompletedSummary] = useState<CompletedSessionSummary | null>(null);
+
+  // Completed session handler
+  const handleSessionFinished = (summary: CompletedSessionSummary) => {
+    // Update streak data
+    const additionalSecs = summary.durationSeconds;
+    const additionalLeaves = summary.leavesEarned;
+
+    setStreakData((prev) => {
+      const newToday = prev.todayStudySeconds + additionalSecs;
+      const newTotalSecs = prev.totalStudySeconds + additionalSecs;
+      const newLeaves = prev.leavesGrownToday + additionalLeaves;
+      const newTotalLeaves = prev.totalLeaves + additionalLeaves;
+      const metDaily = newToday >= prev.dailyGoalSeconds;
+
+      // Update week history
+      const updatedWeek = prev.weekHistory.map((d, i) => {
+        if (i === 4) { // Friday / today
+          return {
+            ...d,
+            seconds: d.seconds + additionalSecs,
+            metGoal: d.seconds + additionalSecs >= prev.dailyGoalSeconds,
+          };
+        }
+        return d;
+      });
+
+      const updatedStreak = {
+        ...prev,
+        todayStudySeconds: newToday,
+        totalStudySeconds: newTotalSecs,
+        leavesGrownToday: newLeaves,
+        totalLeaves: newTotalLeaves,
+        currentStreak: metDaily && prev.currentStreak === 0 ? 1 : prev.currentStreak,
+        longestStreak: Math.max(prev.longestStreak, prev.currentStreak),
+        weekHistory: updatedWeek,
+        daysSinceLastStudy: 0,
+      };
+
+      storageService.saveStreakData(updatedStreak);
+      return updatedStreak;
+    });
+
+    // Check if new milestones unlocked
+    setMilestones((prev) => {
+      const updated = prev.map((m) => {
+        if (streakData.currentStreak >= m.requiredDays) {
+          return { ...m, unlocked: true };
+        }
+        return m;
+      });
+      storageService.saveMilestones(updated);
+      return updated;
+    });
+
+    setCompletedSummary(summary);
+  };
+
+  // Timer engine
+  const timer = useStudyTimer(handleSessionFinished);
+
+  // Joined Room
+  const joinedRoom = rooms.find((r) => r.id === profile.joinedRoomId) || null;
+
+  // Tree Stage derived from streak & total hours
+  const totalHours = Math.round(streakData.totalStudySeconds / 3600);
+  const treeStage: TreeStage = calculateTreeStage(streakData.currentStreak, totalHours);
+
+  // Tree state
+  const treeState: TreeState = timer.isRunning
+    ? 'active_studying'
+    : simulatedMissedDays > 0
+    ? 'missed_days'
+    : streakData.currentStreak >= 5
+    ? 'consistent'
+    : 'idle';
+
+  // Format today's study time
+  const todayHours = Math.floor(streakData.todayStudySeconds / 3600);
+  const todayMins = Math.floor((streakData.todayStudySeconds % 3600) / 60);
+  const goalHours = Math.floor(streakData.dailyGoalSeconds / 3600);
+  const goalMins = Math.floor((streakData.dailyGoalSeconds % 3600) / 60);
+
+  const formattedToday = `${todayHours > 0 ? `${todayHours}h ` : ''}${todayMins}m`;
+  const formattedGoal = `${goalHours > 0 ? `${goalHours}h ` : ''}${goalMins > 0 ? `${goalMins}m` : ''}`;
+
+  // Ghost Mode Toggle
+  const handleToggleGhostMode = () => {
+    const updated = { ...profile, ghostMode: !profile.ghostMode };
+    setProfile(updated);
+    storageService.saveProfile(updated);
+  };
+
+  // Milestone cosmetic equipping
+  const handleEquipItem = (type: 'pot' | 'flora' | 'aura', itemId: string) => {
+    const updated = { ...customization, [type]: itemId };
+    setCustomization(updated);
+    storageService.saveCustomization(updated);
+  };
+
+  // Room actions
+  const handleOpenRoom = (room: StudyRoom) => {
+    if (room.isPrivate && room.id !== profile.joinedRoomId) {
+      setPrivateRoomToUnlock(room);
+    } else {
+      setSelectedRoom(room);
+    }
+  };
+
+  const handleJoinRoom = (roomId: string) => {
+    const updatedProfile = { ...profile, joinedRoomId: roomId };
+    setProfile(updatedProfile);
+    storageService.saveProfile(updatedProfile);
+
+    // Add current user to room's member list if not present
+    setRooms((prev) => {
+      const updated = prev.map((r) => {
+        if (r.id === roomId) {
+          const alreadyMember = r.members.some((m) => m.id === profile.id);
+          if (!alreadyMember) {
+            return {
+              ...r,
+              members: [
+                ...r.members,
+                {
+                  id: profile.id,
+                  name: profile.name,
+                  avatarBg: '#1D8DEA',
+                  isStudying: timer.isRunning,
+                  todaySeconds: streakData.todayStudySeconds,
+                  streakDays: streakData.currentStreak,
+                  isCurrentUser: true,
+                },
+              ],
+            };
+          }
+        }
+        return r;
+      });
+      storageService.saveRooms(updated);
+      return updated;
+    });
+
+    const room = rooms.find((r) => r.id === roomId);
+    if (room) setSelectedRoom(room);
+  };
+
+  const handleLeaveRoom = (roomId: string) => {
+    const updatedProfile = { ...profile, joinedRoomId: undefined };
+    setProfile(updatedProfile);
+    storageService.saveProfile(updatedProfile);
+
+    setRooms((prev) => {
+      const updated = prev.map((r) => {
+        if (r.id === roomId) {
+          return {
+            ...r,
+            members: r.members.filter((m) => m.id !== profile.id),
+          };
+        }
+        return r;
+      });
+      storageService.saveRooms(updated);
+      return updated;
+    });
+  };
+
+  const handleCreateRoom = (newRoom: StudyRoom) => {
+    const updated = [newRoom, ...rooms];
+    setRooms(updated);
+    storageService.saveRooms(updated);
+    handleJoinRoom(newRoom.id);
+  };
+
+  const handleUpdateDailyGoal = (newGoalMins: number) => {
+    const updated: StreakData = {
+      ...streakData,
+      dailyGoalSeconds: newGoalMins * 60,
+    };
+    setStreakData(updated);
+    storageService.saveStreakData(updated);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Navigation */}
+      <Navbar
+        profile={profile}
+        streakData={streakData}
+        onStartStudy={() => setIsStudyModalOpen(true)}
+        onOpenMilestones={() => setIsMilestonesModalOpen(true)}
+        onToggleGhostMode={handleToggleGhostMode}
+      />
+
+      {/* Main Container */}
+      <main
+        style={{
+          flex: 1,
+          maxWidth: '1240px',
+          width: '100%',
+          margin: '0 auto',
+          padding: '36px 24px',
+        }}
+      >
+        {/* Section 5: Main User Experience Hero */}
+        <section
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)',
+            gap: '32px',
+            alignItems: 'center',
+            marginBottom: '36px',
+          }}
         >
-          Count is {count}
-        </button>
-      </section>
+          {/* Left Hero Content */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="overline" style={{ color: 'var(--color-primary)' }}>
+                  DAILY STUDY CYCLE
+                </span>
+                <span
+                  className="xem-chip"
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    backgroundColor: '#FEF3C7',
+                    color: '#B45309',
+                    borderColor: '#FDE68A',
+                  }}
+                >
+                  🔥 {streakData.currentStreak} day streak
+                </span>
+              </div>
 
-      <div className="ticks"></div>
+              <h1 className="headline-display" style={{ color: 'var(--color-secondary)', marginTop: '8px' }}>
+                Good morning, {profile.name}
+              </h1>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+              <p className="body-lg" style={{ color: 'var(--color-muted)', marginTop: '6px' }}>
+                The more consistently you study, the more your tree grows. Focus on rhythm rather than exhaustion.
+              </p>
+            </div>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            {/* Daily Goal Progress Card */}
+            <Card padding="24px" style={{ backgroundColor: 'var(--color-neutral)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                <span className="label-md" style={{ color: 'var(--color-muted)' }}>
+                  Today's Study Progress
+                </span>
+                <span className="stat-value" style={{ color: 'var(--color-primary)', fontSize: '20px' }}>
+                  {formattedToday} / {formattedGoal}
+                </span>
+              </div>
+
+              {/* Progress Bar */}
+              <ProgressBar
+                current={streakData.todayStudySeconds}
+                max={streakData.dailyGoalSeconds}
+                height={12}
+                showLabel={true}
+              />
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '14px',
+                  paddingTop: '12px',
+                  borderTop: '1px solid var(--color-border)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-primary)', fontWeight: 600 }}>
+                  <span>🍃</span>
+                  <span>Your tree grew {streakData.leavesGrownToday} leaves today.</span>
+                </div>
+
+                <span className="body-sm" style={{ fontSize: '12px', color: 'var(--color-muted)' }}>
+                  {streakData.todayStudySeconds >= streakData.dailyGoalSeconds
+                    ? '✓ Daily streak secured'
+                    : `${Math.max(0, Math.round((streakData.dailyGoalSeconds - streakData.todayStudySeconds) / 60))}m left to secure streak`}
+                </span>
+              </div>
+            </Card>
+
+            {/* Main Action CTAs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <Button
+                variant="primary"
+                size="lg"
+                icon={<Play size={20} fill="currentColor" />}
+                onClick={() => setIsStudyModalOpen(true)}
+                style={{ flex: 1.5 }}
+              >
+                Start Studying
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="lg"
+                icon={<Award size={18} />}
+                onClick={() => setIsMilestonesModalOpen(true)}
+                style={{ flex: 1 }}
+              >
+                Tree Perks
+              </Button>
+            </div>
+          </div>
+
+          {/* Right Hero Showcase: The Virtual Tree (Section 6 & 7) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <TreeDisplay
+              stage={treeStage}
+              state={treeState}
+              customization={customization}
+              size="lg"
+              showDetails={true}
+              leavesToday={streakData.leavesGrownToday}
+              daysMissed={simulatedMissedDays}
+            />
+
+            {/* Tree State Simulator Controls (for quick interactive review of Section 7) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                backgroundColor: 'var(--color-surface)',
+                borderRadius: 'var(--rounded-md)',
+                border: '1px solid var(--color-border)',
+                fontSize: '12px',
+              }}
+            >
+              <span style={{ color: 'var(--color-muted)' }}>
+                State Simulator (Section 7):
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setSimulatedMissedDays(simulatedMissedDays > 0 ? 0 : 3)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--color-border)',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    color: simulatedMissedDays > 0 ? 'var(--color-primary)' : 'var(--color-muted)',
+                    fontWeight: simulatedMissedDays > 0 ? 700 : 500,
+                  }}
+                >
+                  {simulatedMissedDays > 0 ? 'Restore Active State' : 'Simulate Missed Days'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 10 & 11: KPI Tiles and Week Checklist */}
+        <section style={{ marginBottom: '36px' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '16px',
+              marginBottom: '20px',
+            }}
+          >
+            <StatTile
+              label="CURRENT STREAK"
+              value={`${streakData.currentStreak} Days`}
+              icon={<Flame size={20} />}
+              color="amber"
+              trend="+1 day today"
+            />
+            <StatTile
+              label="ALL-TIME BEST"
+              value={`${streakData.longestStreak} Days`}
+              icon={<Award size={20} />}
+              color="primary"
+            />
+            <StatTile
+              label="TOTAL STUDY TIME"
+              value={`${totalHours} Hours`}
+              icon={<Clock size={20} />}
+              subValue={`${streakData.totalStudyDays} dedicated days`}
+              color="primary"
+            />
+            <StatTile
+              label="GARDEN FOLIAGE"
+              value={`${streakData.totalLeaves} Leaves`}
+              icon={<Sparkles size={20} />}
+              subValue={`Stage: ${treeStage.replace('_', ' ').toUpperCase()}`}
+              color="success"
+            />
+          </div>
+
+          {/* 7-Day Consistency Week Checklist */}
+          <StreakCard
+            streakData={streakData}
+            onOpenMilestones={() => setIsMilestonesModalOpen(true)}
+            onUpdateDailyGoal={handleUpdateDailyGoal}
+          />
+        </section>
+
+        {/* Sections 12, 13, 14 & 15: Study Rooms */}
+        <RoomsSection
+          rooms={rooms}
+          joinedRoomId={profile.joinedRoomId}
+          onOpenRoom={handleOpenRoom}
+          onCreateRoomClick={() => setIsCreateRoomOpen(true)}
+          ghostMode={profile.ghostMode}
+          onToggleGhostMode={handleToggleGhostMode}
+        />
+      </main>
+
+      {/* Active Focus Study Mode (Section 8) */}
+      {timer.activeSession && (
+        <ActiveStudySession
+          session={timer.activeSession}
+          elapsedSeconds={timer.elapsedSeconds}
+          isRunning={timer.isRunning}
+          onPause={timer.pauseSession}
+          onResume={timer.resumeSession}
+          onFinish={timer.finishSession}
+          onCancel={timer.cancelSession}
+          treeStage={treeStage}
+          customization={customization}
+        />
+      )}
+
+      {/* Study Setup Modal (Section 9) */}
+      <StudySetupModal
+        isOpen={isStudyModalOpen}
+        onClose={() => setIsStudyModalOpen(false)}
+        onStart={timer.startSession}
+        joinedRoom={joinedRoom}
+      />
+
+      {/* Session Completed Celebratory Modal */}
+      <SessionCompleteModal
+        summary={completedSummary}
+        onClose={() => setCompletedSummary(null)}
+        currentStreak={streakData.currentStreak}
+      />
+
+      {/* Streak Milestones & Perks Modal (Section 11) */}
+      <MilestonesModal
+        isOpen={isMilestonesModalOpen}
+        onClose={() => setIsMilestonesModalOpen(false)}
+        milestones={milestones}
+        currentStreak={streakData.currentStreak}
+        customization={customization}
+        onEquipItem={handleEquipItem}
+      />
+
+      {/* Room Detail Modal (Section 13, 14, 15) */}
+      <RoomDetailModal
+        room={selectedRoom}
+        isOpen={!!selectedRoom}
+        onClose={() => setSelectedRoom(null)}
+        isJoined={selectedRoom?.id === profile.joinedRoomId}
+        onJoinRoom={handleJoinRoom}
+        onLeaveRoom={handleLeaveRoom}
+        onStartStudyInRoom={(room) => {
+          setSelectedRoom(null);
+          timer.startSession('focus', `Deep Work @ ${room.name}`, 50, room.id);
+        }}
+        isUserStudyingNow={timer.isRunning && !profile.ghostMode}
+        currentUserTodaySeconds={streakData.todayStudySeconds}
+      />
+
+      {/* Create Room Modal (Section 12 & 15) */}
+      <CreateRoomModal
+        isOpen={isCreateRoomOpen}
+        onClose={() => setIsCreateRoomOpen(false)}
+        onCreateRoom={handleCreateRoom}
+        creatorName={profile.name}
+      />
+
+      {/* Private Room Passcode Modal (Section 15) */}
+      <JoinPrivateModal
+        isOpen={!!privateRoomToUnlock}
+        onClose={() => setPrivateRoomToUnlock(null)}
+        targetRoom={privateRoomToUnlock}
+        onSuccess={(room) => {
+          handleJoinRoom(room.id);
+          setSelectedRoom(room);
+        }}
+      />
+    </div>
+  );
 }
 
-export default App
+export default App;

@@ -939,24 +939,6 @@ The study timer must remain easy to access on mobile.
 
 ---
 
-# 32. ACCESSIBILITY
-
-Implement:
-
-* keyboard navigation
-* accessible buttons
-* proper contrast
-* semantic HTML
-* ARIA labels where needed
-* visible focus states
-* reduced-motion support
-
-Animations must not prevent usability.
-
----
-
-# 33. ANIMATIONS
-
 Animations should be subtle.
 
 Use animations for:
@@ -1125,7 +1107,6 @@ The timer should survive:
 
 ---
 
-# 38. SECURITY
 
 Implement:
 
@@ -1171,7 +1152,6 @@ Provide:
 
 ---
 
-# 40. DEVELOPMENT EXPERIENCE
 
 Create:
 
@@ -1314,37 +1294,7 @@ Then:
 
 ---
 
-# 46. DESIGN PRINCIPLE
 
-The product should communicate one simple concept:
-
-> **Study consistently. Watch your tree grow.**
-
-Every major UI decision should reinforce this.
-
----
-
-# 47. WHAT NOT TO BUILD
-
-For the initial MVP, do NOT build:
-
-* complex social feeds
-* direct messaging
-* payments
-* subscriptions
-* marketplace
-* excessive profile customization
-* complicated friend systems
-* complicated AI agents
-* unnecessary microservices
-* overly complex analytics
-* cryptocurrency/web3 features
-
-Focus on the core loop.
-
----
-
-# 48. CORE MVP LOOP
 
 The MVP must make this loop excellent:
 
@@ -1388,7 +1338,6 @@ Room progress updates
 
 ---
 
-# 49. QUALITY BAR
 
 Do not create a prototype that merely demonstrates functionality.
 
@@ -1409,7 +1358,6 @@ Prioritize:
 
 ---
 
-# 50. FINAL INSTRUCTION TO ANTIGRAVITY
 
 **Before implementing anything, follow the design direction above and create the application architecture around the core experience.**
 
