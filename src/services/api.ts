@@ -2,9 +2,7 @@ import type {
   StudyRoom,
   CompletedSessionSummary,
   LeaderboardEntry,
-  RoomCheer,
-  UserProfile,
-  StreakData
+  RoomCheer
 } from '../types';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
@@ -63,7 +61,29 @@ class ApiClient {
   }
 
   // Auth
-  async login(username: string, password: string): Promise<{ access_token: string; user_id: string; username: string }> {
+  async register(
+    username: string,
+    email: string,
+    password: string,
+    dailyGoalSeconds: number = 7200
+  ): Promise<{ access_token: string; user_id: string; username: string }> {
+    const data = await this.request<{ access_token: string; user_id: string; username: string }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        username,
+        email,
+        password,
+        daily_goal_seconds: dailyGoalSeconds,
+      }),
+    });
+    this.setToken(data.access_token);
+    return data;
+  }
+
+  async login(
+    username: string,
+    password: string
+  ): Promise<{ access_token: string; user_id: string; username: string }> {
     const data = await this.request<{ access_token: string; user_id: string; username: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
@@ -72,7 +92,29 @@ class ApiClient {
     return data;
   }
 
-  async getMe(): Promise<UserProfile & { streak: StreakData }> {
+  logout(): void {
+    this.setToken(null);
+  }
+
+  async getMe(): Promise<{
+    id: string;
+    username: string;
+    email: string;
+    avatar_bg: string;
+    daily_goal_seconds: number;
+    ghost_mode: boolean;
+    ambient_sound: string;
+    current_streak: number;
+    longest_streak: number;
+    total_study_days: number;
+    tree_level: number;
+    total_leaves: number;
+    leaves_today: number;
+    xp: number;
+    pot_type: string;
+    flora_type: string;
+    aura_type: string;
+  }> {
     return this.request('/auth/me');
   }
 

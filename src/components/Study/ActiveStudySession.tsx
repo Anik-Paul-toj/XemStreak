@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { StudySession, TreeStage, TreeCustomization } from '../../types';
 import { TreeDisplay } from '../Tree/TreeDisplay';
 import { Button } from '../UI/Button';
 import { ProgressBar } from '../UI/ProgressBar';
-import { Play, Pause, CheckCircle2, X } from 'lucide-react';
+import { Play, Pause, CheckCircle2, X, Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
 export interface ActiveStudySessionProps {
   session: StudySession;
@@ -28,6 +28,40 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
   treeStage,
   customization,
 }) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(true);
+
+  // Monitor fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      // Clean up fullscreen on unmount if still active
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        setShowPrompt(false);
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Fullscreen toggle failed:', err);
+    }
+  };
+
   // Format elapsed time HH:MM:SS
   const formatTime = (totalSecs: number) => {
     const hours = Math.floor(totalSecs / 3600);
@@ -47,16 +81,20 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
         position: 'fixed',
         inset: 0,
         zIndex: 1000,
-        backgroundColor: 'var(--color-surface)',
+        backgroundColor: isFullscreen ? '#F8FAFD' : 'var(--color-surface)',
+        backgroundImage: isFullscreen
+          ? 'radial-gradient(ellipse at 50% 40%, rgba(29, 141, 234, 0.08) 0%, #F6F9FE 80%)'
+          : undefined,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px',
+        padding: isFullscreen ? '40px 24px' : '24px',
         overflowY: 'auto',
+        transition: 'background-color 0.3s ease',
       }}
     >
-      {/* Top Bar with Cancel / Exit */}
+      {/* Top Bar with Status, Fullscreen Toggle & Exit */}
       <div
         style={{
           position: 'absolute',
@@ -66,7 +104,7 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          maxWidth: '800px',
+          maxWidth: '900px',
           margin: '0 auto',
         }}
       >
@@ -82,30 +120,118 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
             }}
           />
           <span className="label-sm" style={{ color: 'var(--color-muted)' }}>
-            {isRunning ? 'FOCUS MODE ACTIVE' : 'TIMER PAUSED'}
+            {isRunning ? (isFullscreen ? 'ZEN FOCUS MODE (FULLSCREEN)' : 'FOCUS MODE ACTIVE') : 'TIMER PAUSED'}
           </span>
         </div>
 
-        <button
-          onClick={onCancel}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Full Screen Toggle Button */}
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              background: isFullscreen ? 'var(--color-primary-light)' : 'var(--color-neutral)',
+              border: '1px solid var(--color-border)',
+              color: isFullscreen ? 'var(--color-primary)' : 'var(--color-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '7px 14px',
+              borderRadius: 'var(--rounded-full)',
+              boxShadow: 'var(--shadow-subtle)',
+              transition: 'all 0.2s ease',
+            }}
+            title={isFullscreen ? "Exit Fullscreen (or press Esc)" : "Enter Zen Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            <span>{isFullscreen ? 'Exit Full Screen' : 'Full Screen'}</span>
+          </button>
+
+          {/* Cancel / Exit Session */}
+          <button
+            onClick={onCancel}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--color-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+              padding: '8px 12px',
+              borderRadius: 'var(--rounded-md)',
+            }}
+            title="Cancel session without saving"
+          >
+            <X size={16} />
+            <span>Exit</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Fullscreen Prompt Banner (When timer starts, if not in fullscreen) */}
+      {!isFullscreen && showPrompt && (
+        <div
           style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--color-muted)',
-            cursor: 'pointer',
+            position: 'absolute',
+            top: '76px',
+            backgroundColor: 'var(--color-neutral)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--rounded-full)',
+            padding: '6px 16px',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            fontSize: '13px',
-            padding: '8px 12px',
-            borderRadius: 'var(--rounded-md)',
+            gap: '12px',
+            boxShadow: 'var(--shadow-card)',
+            animation: 'fadeIn 0.3s ease-out',
+            zIndex: 10,
           }}
-          title="Cancel session without saving"
         >
-          <X size={16} />
-          <span>Exit Session</span>
-        </button>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-muted)' }}>
+            <Sparkles size={15} color="var(--color-primary)" />
+            <span>Maximize focus with <strong>Zen Fullscreen</strong> mode?</span>
+          </div>
+
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              backgroundColor: 'var(--color-primary)',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: 'var(--rounded-full)',
+              padding: '4px 12px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Maximize2 size={12} />
+            <span>Make Full Screen</span>
+          </button>
+
+          <button
+            onClick={() => setShowPrompt(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--color-muted)',
+              cursor: 'pointer',
+              padding: '2px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Dismiss tip"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Main Focus Console */}
       <div
@@ -168,12 +294,12 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
         )}
 
         {/* Tree Visual in Active State */}
-        <div style={{ width: '100%', maxWidth: '360px' }}>
+        <div style={{ width: '100%', maxWidth: isFullscreen ? '460px' : '360px', transition: 'max-width 0.3s ease' }}>
           <TreeDisplay
             stage={treeStage}
             state={isRunning ? 'active_studying' : 'idle'}
             customization={customization}
-            size="md"
+            size={isFullscreen ? 'lg' : 'md'}
             showDetails={false}
           />
         </div>

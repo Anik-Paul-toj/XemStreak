@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { UserProfile, StreakData } from '../../types';
 import { Button } from '../UI/Button';
-import { Flame, Play, ShieldCheck, TreePine, Bot, BarChart2, Compass } from 'lucide-react';
+import { Flame, Play, ShieldCheck, TreePine, Bot, BarChart2, Compass, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react';
 
 export interface NavbarProps {
   profile: UserProfile;
@@ -12,6 +12,8 @@ export interface NavbarProps {
   onOpenAICompanion: () => void;
   onOpenGardenSpace: () => void;
   onOpenAnalytics: () => void;
+  onOpenAuth: (mode?: 'login' | 'signup') => void;
+  onLogout: () => void;
   isBackendConnected: boolean;
 }
 
@@ -24,8 +26,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAICompanion,
   onOpenGardenSpace,
   onOpenAnalytics,
+  onOpenAuth,
+  onLogout,
   isBackendConnected,
 }) => {
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const isAuthenticated = Boolean(profile.id && profile.name !== 'Guest Learner');
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   return (
     <header
       style={{
@@ -228,8 +246,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Right CTA */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Right CTA & Account controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Button
             variant="primary"
             size="sm"
@@ -239,24 +257,137 @@ export const Navbar: React.FC<NavbarProps> = ({
             Start Studying
           </Button>
 
-          {/* User Avatar */}
-          <div
-            style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
-              backgroundColor: '#1D8DEA',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '13px',
-              fontWeight: 700,
-            }}
-            title={profile.name}
-          >
-            {profile.name.charAt(0)}
-          </div>
+          {isAuthenticated ? (
+            <div style={{ position: 'relative' }} ref={userMenuRef}>
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'none',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--rounded-full)',
+                  padding: '3px 8px 3px 4px',
+                  cursor: 'pointer',
+                  backgroundColor: 'var(--color-neutral)',
+                }}
+                title={`Logged in as ${profile.name}`}
+              >
+                <div
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--color-primary)',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {profile.name.charAt(0).toUpperCase()}
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-secondary)', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {profile.name}
+                </span>
+                <ChevronDown size={14} color="var(--color-muted)" />
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {isUserMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    width: '220px',
+                    backgroundColor: 'var(--color-neutral)',
+                    borderRadius: 'var(--rounded-lg)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-elevated)',
+                    padding: '12px',
+                    zIndex: 100,
+                    animation: 'fadeIn 0.15s ease-out',
+                  }}
+                >
+                  <div style={{ paddingBottom: '10px', marginBottom: '8px', borderBottom: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-secondary)' }}>
+                      {profile.name}
+                    </div>
+                    {profile.email && (
+                      <div style={{ fontSize: '11px', color: 'var(--color-muted)', wordBreak: 'break-all' }}>
+                        {profile.email}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '11px', color: 'var(--color-primary)', marginTop: '4px', fontWeight: 600 }}>
+                      Daily Goal: {Math.round(streakData.dailyGoalSeconds / 60)} mins
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onLogout();
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 10px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderRadius: 'var(--rounded-sm)',
+                      color: 'var(--color-error)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FEF2F2')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <LogOut size={15} />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                onClick={() => onOpenAuth('login')}
+                className="xem-button-secondary"
+                style={{ height: '34px', padding: '0 12px', fontSize: '12px' }}
+              >
+                <LogIn size={13} />
+                <span>Sign In</span>
+              </button>
+              <button
+                onClick={() => onOpenAuth('signup')}
+                style={{
+                  height: '34px',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  backgroundColor: 'var(--color-primary-light)',
+                  color: 'var(--color-primary)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--rounded-md)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <UserPlus size={13} />
+                <span>Sign Up</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -87,7 +87,7 @@ const DEFAULT_MILESTONES: Milestone[] = [
     rewardType: 'tree_pot',
     rewardId: 'terracotta',
     rewardName: 'Terracotta Planter',
-    unlocked: true,
+    unlocked: false,
   },
   {
     id: 'm-7',
@@ -97,7 +97,7 @@ const DEFAULT_MILESTONES: Milestone[] = [
     rewardType: 'flora',
     rewardId: 'sakura_blossom',
     rewardName: 'Cherry Blossoms',
-    unlocked: true,
+    unlocked: false,
   },
   {
     id: 'm-14',
@@ -158,54 +158,9 @@ const DEFAULT_ROOMS: StudyRoom[] = [
     description: 'LeetCode, algorithm problems, and interview preparation.',
     isPrivate: false,
     tags: ['Algorithms', 'Interviews', 'Competitive'],
-    totalStudyHours: 48.5,
-    creatorName: 'Anik',
-    members: [
-      {
-        id: 'user-anik',
-        name: 'Anik',
-        avatarBg: '#1D8DEA',
-        isStudying: true,
-        liveStudyStartedAt: Date.now() - (2 * 3600 + 15 * 60) * 1000,
-        todaySeconds: 2 * 3600 + 15 * 60,
-        streakDays: 28,
-      },
-      {
-        id: 'user-protyoy',
-        name: 'Protyoy',
-        avatarBg: '#18B85A',
-        isStudying: false,
-        todaySeconds: 1 * 3600 + 42 * 60,
-        streakDays: 12,
-        isCurrentUser: true,
-      },
-      {
-        id: 'user-rahul',
-        name: 'Rahul',
-        avatarBg: '#F59E0B',
-        isStudying: true,
-        liveStudyStartedAt: Date.now() - 48 * 60 * 1000,
-        todaySeconds: 48 * 60,
-        streakDays: 7,
-      },
-      {
-        id: 'user-sneha',
-        name: 'Sneha',
-        avatarBg: '#8B5CF6',
-        isStudying: true,
-        liveStudyStartedAt: Date.now() - (3 * 3600 + 2 * 60) * 1000,
-        todaySeconds: 3 * 3600 + 2 * 60,
-        streakDays: 42,
-      },
-      {
-        id: 'user-elena',
-        name: 'Elena Rostova',
-        avatarBg: '#EC4899',
-        isStudying: false,
-        todaySeconds: 1 * 3600 + 10 * 60,
-        streakDays: 19,
-      }
-    ]
+    totalStudyHours: 0,
+    creatorName: 'System',
+    members: []
   },
   {
     id: 'room-quiet',
@@ -213,36 +168,9 @@ const DEFAULT_ROOMS: StudyRoom[] = [
     description: 'Silent study space for reading, research, and deep focus.',
     isPrivate: false,
     tags: ['Reading', 'Deep Work', 'Solo Quiet'],
-    totalStudyHours: 124.2,
-    creatorName: 'Devon',
-    members: [
-      {
-        id: 'user-devon',
-        name: 'Devon Miller',
-        avatarBg: '#10B981',
-        isStudying: true,
-        liveStudyStartedAt: Date.now() - 75 * 60 * 1000,
-        todaySeconds: 2 * 3600 + 10 * 60,
-        streakDays: 34,
-      },
-      {
-        id: 'user-kai',
-        name: 'Kai Tanaka',
-        avatarBg: '#3B82F6',
-        isStudying: false,
-        todaySeconds: 55 * 60,
-        streakDays: 15,
-      },
-      {
-        id: 'user-zara',
-        name: 'Zara Chen',
-        avatarBg: '#6366F1',
-        isStudying: true,
-        liveStudyStartedAt: Date.now() - 120 * 60 * 1000,
-        todaySeconds: 3 * 3600 + 40 * 60,
-        streakDays: 89,
-      }
-    ]
+    totalStudyHours: 0,
+    creatorName: 'System',
+    members: []
   },
   {
     id: 'room-os',
@@ -251,79 +179,58 @@ const DEFAULT_ROOMS: StudyRoom[] = [
     isPrivate: true,
     passcode: '482910',
     tags: ['Systems', 'C/Rust', 'Operating Systems'],
-    totalStudyHours: 72.8,
-    creatorName: 'Marcus',
-    members: [
-      {
-        id: 'user-marcus',
-        name: 'Marcus V.',
-        avatarBg: '#F97316',
-        isStudying: true,
-        liveStudyStartedAt: Date.now() - 95 * 60 * 1000,
-        todaySeconds: 2 * 3600 + 35 * 60,
-        streakDays: 61,
-      },
-      {
-        id: 'user-alex',
-        name: 'Alex Rivera',
-        avatarBg: '#06B6D4',
-        isStudying: false,
-        todaySeconds: 1 * 3600 + 20 * 60,
-        streakDays: 16,
-      }
-    ]
+    totalStudyHours: 0,
+    creatorName: 'System',
+    members: []
   }
 ];
 
-function generateDefaultWeekHistory(dailyGoalSeconds: number): StreakData['weekHistory'] {
+export function generateCleanWeekHistory(): StreakData['weekHistory'] {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const todayIndex = 4; // Let's say today is Friday (matching the prompt's 5-day week mock)
-  
+  const today = new Date();
+  // Monday of current week (ISO week)
+  const dayIndex = (today.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+
   return days.map((day, idx) => {
-    let seconds = 0;
-    if (idx < todayIndex) {
-      // Completed past days
-      seconds = dailyGoalSeconds + (idx % 2 === 0 ? 1200 : 600);
-    } else if (idx === todayIndex) {
-      // Friday: 1h 42m (6120 seconds) matching prompt example
-      seconds = 6120;
-    }
+    const d = new Date(today);
+    d.setDate(today.getDate() - dayIndex + idx);
+    const dateStr = d.toISOString().split('T')[0];
     return {
       dayName: day,
-      dateStr: `2026-09-${20 + idx}`,
-      seconds,
-      metGoal: seconds >= dailyGoalSeconds,
+      dateStr,
+      seconds: 0,
+      metGoal: false,
     };
   });
 }
 
 const DEFAULT_STREAK: StreakData = {
-  currentStreak: 12,
-  longestStreak: 19,
-  totalStudyDays: 48,
-  totalStudySeconds: 48 * 2.1 * 3600,
-  todayStudySeconds: 6120, // 1h 42m as in Section 5 of Prompt.md!
-  dailyGoalSeconds: 7200, // 2h goal
-  leavesGrownToday: 3,
-  totalLeaves: 142,
-  treeLevel: 14,
-  xp: 4200,
-  weekHistory: generateDefaultWeekHistory(7200),
-  lastStudyDate: new Date().toISOString().split('T')[0],
+  currentStreak: 0,
+  longestStreak: 0,
+  totalStudyDays: 0,
+  totalStudySeconds: 0,
+  todayStudySeconds: 0,
+  dailyGoalSeconds: 7200, // 2 hours default
+  leavesGrownToday: 0,
+  totalLeaves: 0,
+  treeLevel: 1, // Stage 1: Seed
+  xp: 0,
+  weekHistory: generateCleanWeekHistory(),
+  lastStudyDate: '',
   daysSinceLastStudy: 0,
 };
 
 const DEFAULT_PROFILE: UserProfile = {
-  id: 'user-protyoy',
-  name: 'Protyoy',
+  id: '',
+  name: 'Guest Learner',
   ghostMode: false,
-  joinedRoomId: 'room-dsa',
+  joinedRoomId: undefined,
   ambientSound: 'rain',
 };
 
 const DEFAULT_CUSTOMIZATION: TreeCustomization = {
-  pot: 'terracotta',
-  flora: 'sakura_blossom',
+  pot: 'none',
+  flora: 'none',
   aura: 'none',
 };
 
@@ -334,7 +241,17 @@ export const storageService = {
       localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(DEFAULT_PROFILE));
       return DEFAULT_PROFILE;
     }
-    return JSON.parse(raw);
+    try {
+      const parsed = JSON.parse(raw);
+      // Migrate away from old dummy Protyoy profile if detected
+      if (parsed.id === 'user-protyoy' || parsed.name === 'Protyoy') {
+        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(DEFAULT_PROFILE));
+        return DEFAULT_PROFILE;
+      }
+      return parsed;
+    } catch {
+      return DEFAULT_PROFILE;
+    }
   },
 
   saveProfile(profile: UserProfile): void {
@@ -347,7 +264,17 @@ export const storageService = {
       localStorage.setItem(STORAGE_KEYS.STREAK, JSON.stringify(DEFAULT_STREAK));
       return DEFAULT_STREAK;
     }
-    return JSON.parse(raw);
+    try {
+      const parsed = JSON.parse(raw);
+      // Migrate away from old dummy 12-day / 6120s streak if detected
+      if (parsed.todayStudySeconds === 6120 || parsed.currentStreak === 12 || parsed.totalLeaves === 142) {
+        localStorage.setItem(STORAGE_KEYS.STREAK, JSON.stringify(DEFAULT_STREAK));
+        return DEFAULT_STREAK;
+      }
+      return parsed;
+    } catch {
+      return DEFAULT_STREAK;
+    }
   },
 
   saveStreakData(data: StreakData): void {
@@ -378,6 +305,15 @@ export const storageService = {
 
   saveMilestones(milestones: Milestone[]): void {
     localStorage.setItem(STORAGE_KEYS.MILESTONES, JSON.stringify(milestones));
+  },
+
+  clearUserData(): void {
+    localStorage.removeItem(STORAGE_KEYS.PROFILE);
+    localStorage.removeItem(STORAGE_KEYS.STREAK);
+    localStorage.removeItem(STORAGE_KEYS.CUSTOMIZATION);
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_SESSION);
+    localStorage.removeItem(STORAGE_KEYS.SESSION_HISTORY);
+    localStorage.removeItem('xemstreak_auth_token');
   },
 
   getRooms(): StudyRoom[] {

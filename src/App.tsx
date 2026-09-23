@@ -34,6 +34,7 @@ import { JoinPrivateModal } from './components/Rooms/JoinPrivateModal';
 import { AICompanionDrawer } from './components/AICompanion/AICompanionDrawer';
 import { AnalyticsModal } from './components/Analytics/AnalyticsModal';
 import { TreeRoomModal } from './components/PersonalSpace/TreeRoomModal';
+import { AuthModal } from './components/Auth/AuthModal';
 
 // Icons
 import { Play, Sparkles, Flame, Clock, Award, Bot, Compass } from 'lucide-react';
@@ -47,10 +48,9 @@ export function App() {
   const [rooms, setRooms] = useState<StudyRoom[]>(() => storageService.getRooms());
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
 
-  // Simulation state for testing Section 7 missed days
-  const [simulatedMissedDays, setSimulatedMissedDays] = useState(0);
-
   // Modals state
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('signup');
   const [isStudyModalOpen, setIsStudyModalOpen] = useState(false);
   const [isMilestonesModalOpen, setIsMilestonesModalOpen] = useState(false);
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
@@ -62,13 +62,13 @@ export function App() {
   const [privateRoomToUnlock, setPrivateRoomToUnlock] = useState<StudyRoom | null>(null);
   const [completedSummary, setCompletedSummary] = useState<CompletedSessionSummary | null>(null);
 
-  // Check backend health & initialize auto sync
+  // Check backend health & sync user state from FastAPI SQLite DB
   useEffect(() => {
     const checkConnection = async () => {
       const ok = await api.checkHealth();
       setIsBackendConnected(ok);
       if (ok) {
-        // Try fetching updated rooms and sync pending
+        // Try fetching updated rooms
         try {
           const remoteRooms = await api.getRooms();
           if (remoteRooms && remoteRooms.length > 0) {
@@ -77,6 +77,45 @@ export function App() {
           }
         } catch {
           // ignore
+        }
+
+        // If authenticated with JWT token, sync live profile & streak from backend
+        if (api.getToken()) {
+          try {
+            const me = await api.getMe();
+            if (me) {
+              setProfile((prev) => {
+                const updated: UserProfile = {
+                  ...prev,
+                  id: me.id,
+                  name: me.username,
+                  email: me.email,
+                  ghostMode: me.ghost_mode,
+                  ambientSound: (me.ambient_sound as UserProfile['ambientSound']) || 'rain',
+                };
+                storageService.saveProfile(updated);
+                return updated;
+              });
+
+              setStreakData((prev) => {
+                const updated: StreakData = {
+                  ...prev,
+                  currentStreak: me.current_streak,
+                  longestStreak: me.longest_streak,
+                  totalStudyDays: me.total_study_days,
+                  dailyGoalSeconds: me.daily_goal_seconds || prev.dailyGoalSeconds,
+                  totalLeaves: me.total_leaves,
+                  treeLevel: (me.tree_level as SpriteStageLevel) || 1,
+                  xp: me.xp || 0,
+                };
+                storageService.saveStreakData(updated);
+                return updated;
+              });
+            }
+          } catch {
+            // Invalid/expired token
+            api.logout();
+          }
         }
       }
     };
@@ -88,6 +127,24 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Auth Handlers
+  const handleAuthSuccess = (newProfile: UserProfile, newStreak: StreakData) => {
+    setProfile(newProfile);
+    setStreakData(newStreak);
+    setIsAuthModalOpen(false);
+  };
+
+  const handleLogout = () => {
+    api.logout();
+    storageService.clearUserData();
+    const cleanProfile = storageService.getProfile();
+    const cleanStreak = storageService.getStreakData();
+    setProfile(cleanProfile);
+    setStreakData(cleanStreak);
+    setIsAuthModalOpen(true);
+    setAuthModalMode('login');
+  };
+
   // Completed session handler
   const handleSessionFinished = async (summary: CompletedSessionSummary) => {
     // 1. Sync through offline-first sync manager
@@ -97,20 +154,21 @@ export function App() {
     const additionalSecs = summary.durationSeconds;
     const additionalLeaves = summary.leavesEarned;
     const additionalXp = Math.floor(additionalSecs / 6);
+    const todayDateStr = new Date().toISOString().split('T')[0];
 
     setStreakData((prev) => {
       const newToday = prev.todayStudySeconds + additionalSecs;
       const newTotalSecs = prev.totalStudySeconds + additionalSecs;
       const newLeaves = prev.leavesGrownToday + additionalLeaves;
       const newTotalLeaves = prev.totalLeaves + additionalLeaves;
-      const newXp = (prev.xp || 4200) + additionalXp;
+      const newXp = (prev.xp || 0) + additionalXp;
       const totalHours = Math.round(newTotalSecs / 3600);
       const newTreeLevel = calculateSpriteStage(prev.currentStreak, totalHours);
       const metDaily = newToday >= prev.dailyGoalSeconds;
 
-      // Update week history
-      const updatedWeek = prev.weekHistory.map((d, i) => {
-        if (i === 4) { // Friday / today
+      // Update week history using actual calendar date
+      const updatedWeek = prev.weekHistory.map((d) => {
+        if (d.dateStr === todayDateStr) {
           return {
             ...d,
             seconds: d.seconds + additionalSecs,
@@ -131,6 +189,7 @@ export function App() {
         currentStreak: metDaily && prev.currentStreak === 0 ? 1 : prev.currentStreak,
         longestStreak: Math.max(prev.longestStreak, prev.currentStreak),
         weekHistory: updatedWeek,
+        lastStudyDate: todayDateStr,
         daysSinceLastStudy: 0,
       };
 
@@ -167,7 +226,7 @@ export function App() {
   // Tree state
   const treeState: TreeState = timer.isRunning
     ? 'active_studying'
-    : simulatedMissedDays > 0
+    : streakData.daysSinceLastStudy > 1
     ? 'missed_days'
     : streakData.currentStreak >= 5
     ? 'consistent'
@@ -304,6 +363,11 @@ export function App() {
         onOpenAICompanion={() => setIsAIDrawerOpen(true)}
         onOpenGardenSpace={() => setIsGardenModalOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
+        onOpenAuth={(mode) => {
+          setAuthModalMode(mode || 'signup');
+          setIsAuthModalOpen(true);
+        }}
+        onLogout={handleLogout}
         isBackendConnected={isBackendConnected}
       />
 
@@ -360,12 +424,18 @@ export function App() {
               </div>
 
               <h1 className="headline-display" style={{ color: 'var(--color-secondary)', marginTop: '8px' }}>
-                Good morning, {profile.name}
+                {profile.id ? `Welcome back, ${profile.name}` : 'Grow Your Study Tree'}
               </h1>
 
-              <p className="body-lg" style={{ color: 'var(--color-muted)', marginTop: '6px' }}>
-                The more consistently you study, the more your tree grows. Focus on rhythm rather than exhaustion.
-              </p>
+              {streakData.totalStudyDays === 0 && streakData.todayStudySeconds === 0 ? (
+                <p className="body-lg" style={{ color: 'var(--color-muted)', marginTop: '6px' }}>
+                  🌱 <strong>Your tree is waiting for its first session.</strong> Plant your seed and watch it grow with every minute of deep focus.
+                </p>
+              ) : (
+                <p className="body-lg" style={{ color: 'var(--color-muted)', marginTop: '6px' }}>
+                  The more consistently you study, the more your tree grows. Focus on rhythm rather than exhaustion.
+                </p>
+              )}
             </div>
 
             {/* Daily Goal Progress Card */}
@@ -454,43 +524,9 @@ export function App() {
               size="lg"
               showDetails={true}
               leavesToday={streakData.leavesGrownToday}
-              daysMissed={simulatedMissedDays}
-              xp={streakData.xp || 4200}
+              daysMissed={streakData.daysSinceLastStudy || 0}
+              xp={streakData.xp || 0}
             />
-
-            {/* Tree State Simulator Controls (for quick interactive review of Section 7) */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                backgroundColor: 'var(--color-surface)',
-                borderRadius: 'var(--rounded-md)',
-                border: '1px solid var(--color-border)',
-                fontSize: '12px',
-              }}
-            >
-              <span style={{ color: 'var(--color-muted)' }}>
-                State Simulator (Section 7):
-              </span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => setSimulatedMissedDays(simulatedMissedDays > 0 ? 0 : 3)}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--color-border)',
-                    padding: '3px 8px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    color: simulatedMissedDays > 0 ? 'var(--color-primary)' : 'var(--color-muted)',
-                    fontWeight: simulatedMissedDays > 0 ? 700 : 500,
-                  }}
-                >
-                  {simulatedMissedDays > 0 ? 'Restore Active State' : 'Simulate Missed Days'}
-                </button>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -509,7 +545,7 @@ export function App() {
               value={`${streakData.currentStreak} Days`}
               icon={<Flame size={20} />}
               color="amber"
-              trend="+1 day today"
+              trend={streakData.currentStreak > 0 ? "+1 day streak" : "Plant your seed today"}
             />
             <StatTile
               label="ALL-TIME BEST"
@@ -519,9 +555,9 @@ export function App() {
             />
             <StatTile
               label="TOTAL STUDY TIME"
-              value={`${totalHours} Hours`}
+              value={`${(streakData.totalStudySeconds / 3600).toFixed(1)} Hours`}
               icon={<Clock size={20} />}
-              subValue={`${streakData.totalStudyDays} dedicated days`}
+              subValue={`${streakData.totalStudyDays} ${streakData.totalStudyDays === 1 ? 'dedicated day' : 'dedicated days'}`}
               color="primary"
             />
             <StatTile
@@ -647,6 +683,14 @@ export function App() {
         onClose={() => setIsGardenModalOpen(false)}
         level={spriteLevel}
         customization={customization}
+      />
+
+      {/* Production Auth Modal (Sign Up & Login) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+        initialMode={authModalMode}
       />
     </div>
   );

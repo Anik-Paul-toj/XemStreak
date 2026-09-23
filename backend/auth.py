@@ -34,25 +34,20 @@ def create_access_token(data: dict, expires_delta: datetime.timedelta = None) ->
 def get_current_user_optional(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
-) -> User:
-    """Returns the authenticated user or the default demo user if unauthenticated."""
+) -> User | None:
+    """Returns the authenticated user or None if unauthenticated."""
     if not token:
-        # Return default demo user for seamless offline-first experience
-        demo_user = db.query(User).filter(User.username == "Protyoy").first()
-        return demo_user
+        return None
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
-            return db.query(User).filter(User.username == "Protyoy").first()
+            return None
     except jwt.PyJWTError:
-        return db.query(User).filter(User.username == "Protyoy").first()
+        return None
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        return db.query(User).filter(User.username == "Protyoy").first()
-    return user
+    return db.query(User).filter(User.id == user_id).first()
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),

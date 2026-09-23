@@ -106,9 +106,12 @@ def register(req: UserRegisterRequest, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/login", response_model=TokenResponse)
 def login(req: UserLoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == req.username).first()
+    # Support login with either username or email
+    user = db.query(User).filter(
+        (User.username == req.username) | (User.email == req.username)
+    ).first()
     if not user or not verify_password(req.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid username/email or password")
 
     token = create_access_token({"sub": user.id, "username": user.username})
     return TokenResponse(access_token=token, user_id=user.id, username=user.username)
