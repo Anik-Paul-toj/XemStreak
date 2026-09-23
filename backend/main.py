@@ -1,12 +1,12 @@
 import os
 import datetime
-from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from typing import List, Optional, Dict, Set
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 
-from .database import engine, Base, get_db
+from .database import engine, Base, get_db, SessionLocal
 from .models import (
     User,
     UserSettings,
@@ -313,6 +313,246 @@ def batch_sync(
         total_leaves=user.tree.total_leaves if user.tree else 0,
         tree_level=user.tree.stage_level if user.tree else 1,
     )
+
+# --------------------------------------------------------------------------
+# Real-Time WebSocket Hub (Rooms, Presence, Cheers)
+# --------------------------------------------------------------------------
+class RoomConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+        self.room_subscriptions: Dict[str, Set[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        for room_id, subs in list(self.room_subscriptions.items()):
+            if websocket in subs:
+                subs.remove(websocket)
+                if not subs:
+                    del self.room_subscriptions[room_id]
+
+    def subscribe_room(self, websocket: WebSocket, room_id: str):
+        if room_id not in self.room_subscriptions:
+            self.room_subscriptions[room_id] = set()
+        self.room_subscriptions[room_id].add(websocket)
+
+    def unsubscribe_room(self, websocket: WebSocket, room_id: str):
+        if room_id in self.room_subscriptions and websocket in self.room_subscriptions[room_id]:
+            self.room_subscriptions[room_id].remove(websocket)
+
+    async def broadcast_all(self, message: dict):
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                pass
+
+    async def broadcast_to_room(self, room_id: str, message: dict):
+        if room_id in self.room_subscriptions:
+            for connection in list(self.room_subscriptions[room_id]):
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    pass
+
+room_manager = RoomConnectionManager()
+
+@app.websocket("/ws/rooms")
+async def websocket_rooms_endpoint(websocket: WebSocket):
+    await room_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            action = data.get("action") or data.get("type")
+            
+            if action == "PING":
+                await websocket.send_json({"type": "PONG", "timestamp": datetime.datetime.utcnow().timestamp()})
+                continue
+
+            if action == "SUBSCRIBE_ROOM":
+                room_id = data.get("roomId")
+                if room_id:
+                    room_manager.subscribe_room(websocket, room_id)
+                continue
+
+            if action == "UNSUBSCRIBE_ROOM":
+                room_id = data.get("roomId")
+                if room_id:
+                    room_manager.unsubscribe_room(websocket, room_id)
+                continue
+
+            db = SessionLocal()
+            try:
+                if action == "CREATE_ROOM":
+                    payload = data.get("payload", {})
+                    user_id = data.get("userId")
+                    user = db.query(User).filter(User.id == user_id).first() if user_id else None
+                    
+                    room_id = f"room-{int(datetime.datetime.utcnow().timestamp())}"
+                    room = StudyRoomModel(
+                        id=room_id,
+                        name=payload.get("name", "Focus Room"),
+                        description=payload.get("description", ""),
+                        is_private=payload.get("isPrivate", False) or payload.get("is_private", False),
+                        passcode=payload.get("passcode") if (payload.get("isPrivate") or payload.get("is_private")) else None,
+                        tags=payload.get("tags") or "Study,Focus",
+                        total_study_hours=0.0,
+                        creator_id=user_id if user else "user-local",
+                    )
+                    db.add(room)
+                    db.flush()
+
+                    creator_name = payload.get("creatorName", user.username if user else "Learner")
+                    creator_avatar = user.avatar_bg if user else "#1D8DEA"
+                    
+                    if user:
+                        member = RoomMemberModel(room_id=room.id, user_id=user.id, is_studying=False)
+                        db.add(member)
+                        db.commit()
+
+                    tag_list = [t.strip() for t in (room.tags or "").split(",") if t.strip()]
+                    room_dict = {
+                        "id": room.id,
+                        "name": room.name,
+                        "description": room.description,
+                        "isPrivate": room.is_private,
+                        "passcode": room.passcode,
+                        "tags": tag_list,
+                        "totalStudyHours": 0.0,
+                        "members": [
+                            {
+                                "id": user_id or "user-creator",
+                                "name": creator_name,
+                                "avatarBg": creator_avatar,
+                                "isStudying": False,
+                                "todaySeconds": 0,
+                                "streakDays": user.streak.current_streak if (user and user.streak) else 0,
+                                "isCurrentUser": False,
+                            }
+                        ]
+                    }
+                    await room_manager.broadcast_all({
+                        "type": "ROOM_CREATED",
+                        "room": room_dict
+                    })
+
+                elif action == "JOIN_ROOM":
+                    room_id = data.get("roomId")
+                    user_id = data.get("userId")
+                    user_name = data.get("userName", "Peer")
+                    user_avatar = data.get("avatarBg", "#1D8DEA")
+                    
+                    if room_id:
+                        room_manager.subscribe_room(websocket, room_id)
+                        if user_id:
+                            existing = db.query(RoomMemberModel).filter(
+                                RoomMemberModel.room_id == room_id,
+                                RoomMemberModel.user_id == user_id
+                            ).first()
+                            if not existing:
+                                member = RoomMemberModel(room_id=room_id, user_id=user_id, is_studying=False)
+                                db.add(member)
+                                db.commit()
+                        
+                        await room_manager.broadcast_to_room(room_id, {
+                            "type": "MEMBER_JOINED",
+                            "roomId": room_id,
+                            "member": {
+                                "id": user_id,
+                                "name": user_name,
+                                "avatarBg": user_avatar,
+                                "isStudying": False,
+                                "todaySeconds": 0,
+                                "streakDays": 1,
+                            }
+                        })
+
+                elif action == "START_STUDY":
+                    room_id = data.get("roomId")
+                    user_id = data.get("userId")
+                    is_ghost = data.get("ghostMode", False)
+                    started_at = datetime.datetime.utcnow().timestamp()
+
+                    if room_id and user_id:
+                        member = db.query(RoomMemberModel).filter(
+                            RoomMemberModel.room_id == room_id,
+                            RoomMemberModel.user_id == user_id
+                        ).first()
+                        if member:
+                            member.is_studying = not is_ghost
+                            member.study_started_at = datetime.datetime.utcnow()
+                            db.commit()
+
+                        await room_manager.broadcast_to_room(room_id, {
+                            "type": "MEMBER_STUDY_STATUS",
+                            "roomId": room_id,
+                            "userId": user_id,
+                            "isStudying": not is_ghost,
+                            "studyStartedAt": started_at if not is_ghost else None,
+                        })
+
+                elif action == "STOP_STUDY":
+                    room_id = data.get("roomId")
+                    user_id = data.get("userId")
+                    session_seconds = data.get("sessionSeconds", 0)
+
+                    if room_id and user_id:
+                        member = db.query(RoomMemberModel).filter(
+                            RoomMemberModel.room_id == room_id,
+                            RoomMemberModel.user_id == user_id
+                        ).first()
+                        if member:
+                            member.is_studying = False
+                            member.today_seconds += session_seconds
+                            member.study_started_at = None
+                            db.commit()
+
+                        await room_manager.broadcast_to_room(room_id, {
+                            "type": "MEMBER_STUDY_STATUS",
+                            "roomId": room_id,
+                            "userId": user_id,
+                            "isStudying": False,
+                            "sessionSeconds": session_seconds,
+                        })
+
+                elif action == "SEND_CHEER":
+                    room_id = data.get("roomId")
+                    from_user = data.get("fromUserName", "Anonymous")
+                    to_user = data.get("toUserName", "Everyone")
+                    reaction = data.get("reaction", "heart")
+
+                    if room_id:
+                        cheer = RoomCheerModel(
+                            room_id=room_id,
+                            from_user_name=from_user,
+                            to_user_name=to_user,
+                            reaction=reaction,
+                        )
+                        db.add(cheer)
+                        db.commit()
+
+                        await room_manager.broadcast_to_room(room_id, {
+                            "type": "CHEER_RECEIVED",
+                            "roomId": room_id,
+                            "cheer": {
+                                "id": f"cheer-{int(datetime.datetime.utcnow().timestamp() * 1000)}",
+                                "from_user_name": from_user,
+                                "to_user_name": to_user,
+                                "reaction": reaction,
+                                "created_at": datetime.datetime.utcnow().isoformat(),
+                            }
+                        })
+            finally:
+                db.close()
+
+    except WebSocketDisconnect:
+        room_manager.disconnect(websocket)
+    except Exception:
+        room_manager.disconnect(websocket)
 
 # --------------------------------------------------------------------------
 # Study Rooms, Leaderboard & Social Cheers (Sections 12, 13, 14, 15, 16, 17)

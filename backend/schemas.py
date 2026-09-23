@@ -1,11 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
 # Auth schemas
 class UserRegisterRequest(BaseModel):
     username: str
-    email: EmailStr
+    email: str
     password: str
     daily_goal_seconds: Optional[int] = 7200
 
