@@ -16,6 +16,18 @@ export interface TreeStageInfo {
   leafMultiplier: number;
 }
 
+export type SpriteStageLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22;
+
+export interface SpriteStageInfo {
+  level: SpriteStageLevel;
+  name: string;
+  stageGroup: string;
+  description: string;
+  minStreak: number;
+  minTotalHours: number;
+  spriteUrl: string;
+}
+
 export type TreeState = 'idle' | 'active_studying' | 'consistent' | 'missed_days';
 
 export type TreePot = 'none' | 'terracotta' | 'ceramic' | 'zen_stone';
@@ -65,9 +77,11 @@ export interface StreakData {
   totalStudyDays: number;
   totalStudySeconds: number;
   todayStudySeconds: number;
-  dailyGoalSeconds: number; // e.g. 7200 for 2h (default 60m = 3600 or user set)
+  dailyGoalSeconds: number;
   leavesGrownToday: number;
   totalLeaves: number;
+  treeLevel: SpriteStageLevel; // Level 1 to 22 matching sprite sheet!
+  xp: number;
   weekHistory: DayProgress[];
   lastStudyDate: string; // YYYY-MM-DD
   daysSinceLastStudy: number;
@@ -97,6 +111,23 @@ export interface RoomMember {
   isCurrentUser?: boolean;
 }
 
+export interface RoomCheer {
+  id: number;
+  roomId: string;
+  fromUserName: string;
+  toUserName?: string;
+  reaction: string;
+  createdAt: string;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  username: string;
+  studySeconds: number;
+  streakDays: number;
+  isCurrentUser?: boolean;
+}
+
 export interface StudyRoom {
   id: string;
   name: string;
@@ -107,11 +138,24 @@ export interface StudyRoom {
   totalStudyHours: number;
   members: RoomMember[];
   creatorName: string;
+  cheers?: RoomCheer[];
 }
+
+export interface AIChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  provider?: string;
+  timestamp: string;
+}
+
+export type AmbianceSoundType = 'none' | 'rain' | 'forest' | 'lofi' | 'cafe';
 
 export interface UserProfile {
   id: string;
   name: string;
+  email?: string;
   ghostMode: boolean; // Hide study status in rooms
   joinedRoomId?: string;
+  ambientSound: AmbianceSoundType;
 }

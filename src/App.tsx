@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type {
   TreeStage,
   TreeState,
   TreeCustomization,
+  SpriteStageLevel,
   StudyRoom,
   CompletedSessionSummary,
   StreakData,
   UserProfile,
   Milestone
 } from './types';
-import { storageService, calculateTreeStage } from './services/storage';
+import { storageService, calculateTreeStage, calculateSpriteStage } from './services/storage';
 import { useStudyTimer } from './hooks/useStudyTimer';
+import { api } from './services/api';
+import { syncManager } from './services/syncQueue';
 
 // Components
 import { Navbar } from './components/Navigation/Navbar';
@@ -28,9 +31,12 @@ import { RoomsSection } from './components/Rooms/RoomsSection';
 import { RoomDetailModal } from './components/Rooms/RoomDetailModal';
 import { CreateRoomModal } from './components/Rooms/CreateRoomModal';
 import { JoinPrivateModal } from './components/Rooms/JoinPrivateModal';
+import { AICompanionDrawer } from './components/AICompanion/AICompanionDrawer';
+import { AnalyticsModal } from './components/Analytics/AnalyticsModal';
+import { TreeRoomModal } from './components/PersonalSpace/TreeRoomModal';
 
 // Icons
-import { Play, Sparkles, Flame, Clock, Award } from 'lucide-react';
+import { Play, Sparkles, Flame, Clock, Award, Bot, Compass } from 'lucide-react';
 
 export function App() {
   // Persistence state
@@ -39,6 +45,7 @@ export function App() {
   const [customization, setCustomization] = useState<TreeCustomization>(() => storageService.getCustomization());
   const [milestones, setMilestones] = useState<Milestone[]>(() => storageService.getMilestones());
   const [rooms, setRooms] = useState<StudyRoom[]>(() => storageService.getRooms());
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
 
   // Simulation state for testing Section 7 missed days
   const [simulatedMissedDays, setSimulatedMissedDays] = useState(0);
@@ -47,21 +54,58 @@ export function App() {
   const [isStudyModalOpen, setIsStudyModalOpen] = useState(false);
   const [isMilestonesModalOpen, setIsMilestonesModalOpen] = useState(false);
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
+  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [isGardenModalOpen, setIsGardenModalOpen] = useState(false);
+
   const [selectedRoom, setSelectedRoom] = useState<StudyRoom | null>(null);
   const [privateRoomToUnlock, setPrivateRoomToUnlock] = useState<StudyRoom | null>(null);
   const [completedSummary, setCompletedSummary] = useState<CompletedSessionSummary | null>(null);
 
+  // Check backend health & initialize auto sync
+  useEffect(() => {
+    const checkConnection = async () => {
+      const ok = await api.checkHealth();
+      setIsBackendConnected(ok);
+      if (ok) {
+        // Try fetching updated rooms and sync pending
+        try {
+          const remoteRooms = await api.getRooms();
+          if (remoteRooms && remoteRooms.length > 0) {
+            setRooms(remoteRooms);
+            storageService.saveRooms(remoteRooms);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 15000);
+    syncManager.initAutoSync();
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Completed session handler
-  const handleSessionFinished = (summary: CompletedSessionSummary) => {
-    // Update streak data
+  const handleSessionFinished = async (summary: CompletedSessionSummary) => {
+    // 1. Sync through offline-first sync manager
+    await syncManager.recordSession(summary);
+
+    // 2. Update local state
     const additionalSecs = summary.durationSeconds;
     const additionalLeaves = summary.leavesEarned;
+    const additionalXp = Math.floor(additionalSecs / 6);
 
     setStreakData((prev) => {
       const newToday = prev.todayStudySeconds + additionalSecs;
       const newTotalSecs = prev.totalStudySeconds + additionalSecs;
       const newLeaves = prev.leavesGrownToday + additionalLeaves;
       const newTotalLeaves = prev.totalLeaves + additionalLeaves;
+      const newXp = (prev.xp || 4200) + additionalXp;
+      const totalHours = Math.round(newTotalSecs / 3600);
+      const newTreeLevel = calculateSpriteStage(prev.currentStreak, totalHours);
       const metDaily = newToday >= prev.dailyGoalSeconds;
 
       // Update week history
@@ -76,12 +120,14 @@ export function App() {
         return d;
       });
 
-      const updatedStreak = {
+      const updatedStreak: StreakData = {
         ...prev,
         todayStudySeconds: newToday,
         totalStudySeconds: newTotalSecs,
         leavesGrownToday: newLeaves,
         totalLeaves: newTotalLeaves,
+        xp: newXp,
+        treeLevel: newTreeLevel,
         currentStreak: metDaily && prev.currentStreak === 0 ? 1 : prev.currentStreak,
         longestStreak: Math.max(prev.longestStreak, prev.currentStreak),
         weekHistory: updatedWeek,
@@ -113,9 +159,10 @@ export function App() {
   // Joined Room
   const joinedRoom = rooms.find((r) => r.id === profile.joinedRoomId) || null;
 
-  // Tree Stage derived from streak & total hours
+  // Tree Stage and 22-Level calculation
   const totalHours = Math.round(streakData.totalStudySeconds / 3600);
-  const treeStage: TreeStage = calculateTreeStage(streakData.currentStreak, totalHours);
+  const legacyStage: TreeStage = calculateTreeStage(streakData.currentStreak, totalHours);
+  const spriteLevel: SpriteStageLevel = streakData.treeLevel || calculateSpriteStage(streakData.currentStreak, totalHours);
 
   // Tree state
   const treeState: TreeState = timer.isRunning
@@ -163,7 +210,6 @@ export function App() {
     setProfile(updatedProfile);
     storageService.saveProfile(updatedProfile);
 
-    // Add current user to room's member list if not present
     setRooms((prev) => {
       const updated = prev.map((r) => {
         if (r.id === roomId) {
@@ -216,11 +262,25 @@ export function App() {
     });
   };
 
-  const handleCreateRoom = (newRoom: StudyRoom) => {
+  const handleCreateRoom = async (newRoom: StudyRoom) => {
     const updated = [newRoom, ...rooms];
     setRooms(updated);
     storageService.saveRooms(updated);
     handleJoinRoom(newRoom.id);
+
+    if (isBackendConnected) {
+      try {
+        await api.createRoom({
+          name: newRoom.name,
+          description: newRoom.description,
+          is_private: newRoom.isPrivate,
+          passcode: newRoom.passcode,
+          tags: newRoom.tags.join(','),
+        });
+      } catch (err) {
+        console.log('Room synced locally first:', err);
+      }
+    }
   };
 
   const handleUpdateDailyGoal = (newGoalMins: number) => {
@@ -241,6 +301,10 @@ export function App() {
         onStartStudy={() => setIsStudyModalOpen(true)}
         onOpenMilestones={() => setIsMilestonesModalOpen(true)}
         onToggleGhostMode={handleToggleGhostMode}
+        onOpenAICompanion={() => setIsAIDrawerOpen(true)}
+        onOpenGardenSpace={() => setIsGardenModalOpen(true)}
+        onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
+        isBackendConnected={isBackendConnected}
       />
 
       {/* Main Container */}
@@ -250,7 +314,7 @@ export function App() {
           maxWidth: '1240px',
           width: '100%',
           margin: '0 auto',
-          padding: '36px 24px',
+          padding: '32px 24px',
         }}
       >
         {/* Section 5: Main User Experience Hero */}
@@ -281,6 +345,17 @@ export function App() {
                   }}
                 >
                   🔥 {streakData.currentStreak} day streak
+                </span>
+                <span
+                  className="xem-chip"
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    backgroundColor: 'var(--color-primary-light)',
+                    color: 'var(--color-primary)',
+                  }}
+                >
+                  Level {spriteLevel} / 22
                 </span>
               </div>
 
@@ -336,7 +411,7 @@ export function App() {
             </Card>
 
             {/* Main Action CTAs */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Button
                 variant="primary"
                 size="lg"
@@ -350,25 +425,37 @@ export function App() {
               <Button
                 variant="secondary"
                 size="lg"
-                icon={<Award size={18} />}
-                onClick={() => setIsMilestonesModalOpen(true)}
+                icon={<Bot size={18} />}
+                onClick={() => setIsAIDrawerOpen(true)}
                 style={{ flex: 1 }}
               >
-                Tree Perks
+                AI Companion
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="lg"
+                icon={<Compass size={18} />}
+                onClick={() => setIsGardenModalOpen(true)}
+                style={{ flex: 1 }}
+              >
+                Sanctuary
               </Button>
             </div>
           </div>
 
-          {/* Right Hero Showcase: The Virtual Tree (Section 6 & 7) */}
+          {/* Right Hero Showcase: The 22-Stage Sprite Tree (Section 6, 7 & 30) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <TreeDisplay
-              stage={treeStage}
+              stage={legacyStage}
+              level={spriteLevel}
               state={treeState}
               customization={customization}
               size="lg"
               showDetails={true}
               leavesToday={streakData.leavesGrownToday}
               daysMissed={simulatedMissedDays}
+              xp={streakData.xp || 4200}
             />
 
             {/* Tree State Simulator Controls (for quick interactive review of Section 7) */}
@@ -438,10 +525,10 @@ export function App() {
               color="primary"
             />
             <StatTile
-              label="GARDEN FOLIAGE"
+              label="HARVESTED LEAVES"
               value={`${streakData.totalLeaves} Leaves`}
               icon={<Sparkles size={20} />}
-              subValue={`Stage: ${treeStage.replace('_', ' ').toUpperCase()}`}
+              subValue={`Sprite Level: ${spriteLevel}/22`}
               color="success"
             />
           </div>
@@ -454,7 +541,7 @@ export function App() {
           />
         </section>
 
-        {/* Sections 12, 13, 14 & 15: Study Rooms */}
+        {/* Sections 12, 13, 14, 15, 16 & 17: Study Rooms */}
         <RoomsSection
           rooms={rooms}
           joinedRoomId={profile.joinedRoomId}
@@ -475,7 +562,7 @@ export function App() {
           onResume={timer.resumeSession}
           onFinish={timer.finishSession}
           onCancel={timer.cancelSession}
-          treeStage={treeStage}
+          treeStage={legacyStage}
           customization={customization}
         />
       )}
@@ -505,7 +592,7 @@ export function App() {
         onEquipItem={handleEquipItem}
       />
 
-      {/* Room Detail Modal (Section 13, 14, 15) */}
+      {/* Room Detail Modal (Sections 13, 14, 15, 16, 17) */}
       <RoomDetailModal
         room={selectedRoom}
         isOpen={!!selectedRoom}
@@ -538,6 +625,28 @@ export function App() {
           handleJoinRoom(room.id);
           setSelectedRoom(room);
         }}
+      />
+
+      {/* AI Study Companion Drawer (Sections 18, 19, 20) */}
+      <AICompanionDrawer
+        isOpen={isAIDrawerOpen}
+        onClose={() => setIsAIDrawerOpen(false)}
+        roomName={joinedRoom ? joinedRoom.name : undefined}
+      />
+
+      {/* Analytics Modal (Section 28) */}
+      <AnalyticsModal
+        isOpen={isAnalyticsModalOpen}
+        onClose={() => setIsAnalyticsModalOpen(false)}
+        streakData={streakData}
+      />
+
+      {/* Tree Room / Personal Space Modal (Section 29) */}
+      <TreeRoomModal
+        isOpen={isGardenModalOpen}
+        onClose={() => setIsGardenModalOpen(false)}
+        level={spriteLevel}
+        customization={customization}
       />
     </div>
   );

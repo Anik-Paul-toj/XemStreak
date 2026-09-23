@@ -6,6 +6,8 @@ import type {
   TreeCustomization,
   TreeStage,
   TreeStageInfo,
+  SpriteStageLevel,
+  SpriteStageInfo,
   StudySession,
   CompletedSessionSummary
 } from '../types';
@@ -18,65 +20,52 @@ const STORAGE_KEYS = {
   ROOMS: 'xemstreak_rooms_v1',
   ACTIVE_SESSION: 'xemstreak_active_session_v1',
   SESSION_HISTORY: 'xemstreak_session_history_v1',
+  OFFLINE_QUEUE: 'xemstreak_offline_queue_v1',
 };
 
+export const SPRITE_STAGES_CONFIG: Record<SpriteStageLevel, SpriteStageInfo> = {
+  1: { level: 1, name: 'Seed', stageGroup: 'Seed', description: 'A quiet dormant seed planted in rich organic soil.', minStreak: 0, minTotalHours: 0, spriteUrl: '/sprites/stage_1.png' },
+  2: { level: 2, name: 'Cracked Seed', stageGroup: 'Seed', description: 'Nascent roots pushing through the fertile earth.', minStreak: 1, minTotalHours: 1, spriteUrl: '/sprites/stage_2.png' },
+  3: { level: 3, name: 'Sprout', stageGroup: 'Sprout', description: 'Fresh green cotyledons bursting with fresh curiosity.', minStreak: 2, minTotalHours: 2, spriteUrl: '/sprites/stage_3.png' },
+  4: { level: 4, name: 'Tiny Sprout', stageGroup: 'Sprout', description: 'Delicate leaves lifting upward toward the morning sunlight.', minStreak: 3, minTotalHours: 3, spriteUrl: '/sprites/stage_4.png' },
+  5: { level: 5, name: 'Small Plant', stageGroup: 'Plant', description: 'First true leaves establishing steady biological rhythm.', minStreak: 4, minTotalHours: 5, spriteUrl: '/sprites/stage_5.png' },
+  6: { level: 6, name: 'Seedling', stageGroup: 'Plant', description: 'A resilient stem putting down firm roots.', minStreak: 5, minTotalHours: 7, spriteUrl: '/sprites/stage_6.png' },
+  7: { level: 7, name: 'Young Plant', stageGroup: 'Plant', description: 'Stems thickening with vigorous daily focus.', minStreak: 6, minTotalHours: 9, spriteUrl: '/sprites/stage_7.png' },
+  8: { level: 8, name: 'Growing Plant', stageGroup: 'Plant', description: 'Branching nodes drinking in consistent study hours.', minStreak: 7, minTotalHours: 12, spriteUrl: '/sprites/stage_8.png' },
+  9: { level: 9, name: 'Bigger Plant', stageGroup: 'Sapling', description: 'Broadening foliage storing compound knowledge.', minStreak: 8, minTotalHours: 15, spriteUrl: '/sprites/stage_9.png' },
+  10: { level: 10, name: 'Bushy Sapling', stageGroup: 'Sapling', description: 'Dense emerald growth showing strong habit formation.', minStreak: 9, minTotalHours: 18, spriteUrl: '/sprites/stage_10.png' },
+  11: { level: 11, name: 'Tall Sapling', stageGroup: 'Sapling', description: 'Rising high with disciplined academic determination.', minStreak: 10, minTotalHours: 22, spriteUrl: '/sprites/stage_11.png' },
+  12: { level: 12, name: 'Small Tree', stageGroup: 'Tree', description: 'Firm hardwood bark developing on the main trunk.', minStreak: 11, minTotalHours: 26, spriteUrl: '/sprites/stage_12.png' },
+  13: { level: 13, name: 'Growing Tree', stageGroup: 'Tree', description: 'Sturdy primary boughs spreading outwards.', minStreak: 12, minTotalHours: 32, spriteUrl: '/sprites/stage_13.png' },
+  14: { level: 14, name: 'Young Tree', stageGroup: 'Tree', description: 'Spreading young branches forming an eager emerald canopy.', minStreak: 14, minTotalHours: 38, spriteUrl: '/sprites/stage_14.png' },
+  15: { level: 15, name: 'Leafy Tree', stageGroup: 'Tree', description: 'Lush umbrella of leaves offering quiet focus shelter.', minStreak: 16, minTotalHours: 46, spriteUrl: '/sprites/stage_15.png' },
+  16: { level: 16, name: 'Full Tree', stageGroup: 'Tree', description: 'A grand rounded canopy enduring across seasons.', minStreak: 20, minTotalHours: 56, spriteUrl: '/sprites/stage_16.png' },
+  17: { level: 17, name: 'Lush Tree', stageGroup: 'Tree', description: 'Thick, layered moss and wild vitality along the roots.', minStreak: 25, minTotalHours: 70, spriteUrl: '/sprites/stage_17.png' },
+  18: { level: 18, name: 'Budding Tree', stageGroup: 'Flowering', description: 'Nascent floral buds preparing for milestone bloom.', minStreak: 30, minTotalHours: 85, spriteUrl: '/sprites/stage_18.png' },
+  19: { level: 19, name: 'Flowering Tree', stageGroup: 'Flowering', description: 'Vibrant blossoms and visiting bees honoring your craft.', minStreak: 40, minTotalHours: 105, spriteUrl: '/sprites/stage_19.png' },
+  20: { level: 20, name: 'Blooming Tree', stageGroup: 'Flowering', description: 'A sea of fragrant petals floating in the breeze.', minStreak: 50, minTotalHours: 130, spriteUrl: '/sprites/stage_20.png' },
+  21: { level: 21, name: 'Fruiting Tree', stageGroup: 'Fruiting', description: 'Ripe ruby fruits representing harvested wisdom.', minStreak: 75, minTotalHours: 160, spriteUrl: '/sprites/stage_21.png' },
+  22: { level: 22, name: 'Mature Tree', stageGroup: 'Ancient', description: 'The pinnacle of mastery, glowing with radiant celestial aura.', minStreak: 100, minTotalHours: 200, spriteUrl: '/sprites/stage_22.png' },
+};
+
+export function calculateSpriteStage(currentStreak: number, totalStudyHours: number): SpriteStageLevel {
+  for (let lvl = 22; lvl >= 1; lvl--) {
+    const config = SPRITE_STAGES_CONFIG[lvl as SpriteStageLevel];
+    if (currentStreak >= config.minStreak || totalStudyHours >= config.minTotalHours) {
+      return lvl as SpriteStageLevel;
+    }
+  }
+  return 1;
+}
+
 export const TREE_STAGES_CONFIG: Record<TreeStage, TreeStageInfo> = {
-  seed: {
-    stage: 'seed',
-    name: 'Seed',
-    minStreak: 0,
-    minTotalHours: 0,
-    description: 'A dormant seed planted in fertile soil, awaiting your focus.',
-    leafMultiplier: 1,
-  },
-  sprout: {
-    stage: 'sprout',
-    name: 'Sprout',
-    minStreak: 2,
-    minTotalHours: 2,
-    description: 'Fresh green cotyledons bursting with fresh curiosity.',
-    leafMultiplier: 1.1,
-  },
-  sapling: {
-    stage: 'sapling',
-    name: 'Sapling',
-    minStreak: 5,
-    minTotalHours: 6,
-    description: 'A resilient stem putting down firm roots.',
-    leafMultiplier: 1.25,
-  },
-  young_tree: {
-    stage: 'young_tree',
-    name: 'Young Tree',
-    minStreak: 10,
-    minTotalHours: 15,
-    description: 'Spreading young branches forming an eager emerald canopy.',
-    leafMultiplier: 1.4,
-  },
-  mature_tree: {
-    stage: 'mature_tree',
-    name: 'Mature Tree',
-    minStreak: 25,
-    minTotalHours: 40,
-    description: 'Strong hardwood trunk with expansive shelter and steady growth.',
-    leafMultiplier: 1.6,
-  },
-  large_tree: {
-    stage: 'large_tree',
-    name: 'Large Tree',
-    minStreak: 50,
-    minTotalHours: 90,
-    description: 'A towering presence that flourishes through all seasons.',
-    leafMultiplier: 1.8,
-  },
-  ancient_tree: {
-    stage: 'ancient_tree',
-    name: 'Ancient Tree',
-    minStreak: 100,
-    minTotalHours: 200,
-    description: 'An ageless landmark of discipline, wisdom, and deep work.',
-    leafMultiplier: 2.2,
-  },
+  seed: { stage: 'seed', name: 'Seed', minStreak: 0, minTotalHours: 0, description: 'A dormant seed planted in fertile soil.', leafMultiplier: 1 },
+  sprout: { stage: 'sprout', name: 'Sprout', minStreak: 2, minTotalHours: 2, description: 'Fresh green cotyledons bursting with curiosity.', leafMultiplier: 1.1 },
+  sapling: { stage: 'sapling', name: 'Sapling', minStreak: 5, minTotalHours: 6, description: 'A resilient stem putting down firm roots.', leafMultiplier: 1.25 },
+  young_tree: { stage: 'young_tree', name: 'Young Tree', minStreak: 10, minTotalHours: 15, description: 'Spreading young branches forming an emerald canopy.', leafMultiplier: 1.4 },
+  mature_tree: { stage: 'mature_tree', name: 'Mature Tree', minStreak: 25, minTotalHours: 40, description: 'Strong hardwood trunk with expansive shelter.', leafMultiplier: 1.6 },
+  large_tree: { stage: 'large_tree', name: 'Large Tree', minStreak: 50, minTotalHours: 90, description: 'A towering presence that flourishes through all seasons.', leafMultiplier: 1.8 },
+  ancient_tree: { stage: 'ancient_tree', name: 'Ancient Tree', minStreak: 100, minTotalHours: 200, description: 'An ageless landmark of discipline and deep work.', leafMultiplier: 2.2 },
 };
 
 export function calculateTreeStage(currentStreak: number, totalStudyHours: number): TreeStage {
@@ -317,6 +306,8 @@ const DEFAULT_STREAK: StreakData = {
   dailyGoalSeconds: 7200, // 2h goal
   leavesGrownToday: 3,
   totalLeaves: 142,
+  treeLevel: 14,
+  xp: 4200,
   weekHistory: generateDefaultWeekHistory(7200),
   lastStudyDate: new Date().toISOString().split('T')[0],
   daysSinceLastStudy: 0,
@@ -327,6 +318,7 @@ const DEFAULT_PROFILE: UserProfile = {
   name: 'Protyoy',
   ghostMode: false,
   joinedRoomId: 'room-dsa',
+  ambientSound: 'rain',
 };
 
 const DEFAULT_CUSTOMIZATION: TreeCustomization = {
@@ -423,6 +415,21 @@ export const storageService = {
     const history = this.getSessionHistory();
     history.unshift(session);
     localStorage.setItem(STORAGE_KEYS.SESSION_HISTORY, JSON.stringify(history.slice(0, 50)));
+  },
+
+  getOfflineQueue(): CompletedSessionSummary[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.OFFLINE_QUEUE);
+    return raw ? JSON.parse(raw) : [];
+  },
+
+  enqueueOfflineSession(session: CompletedSessionSummary): void {
+    const queue = this.getOfflineQueue();
+    queue.push(session);
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
+  },
+
+  clearOfflineQueue(): void {
+    localStorage.removeItem(STORAGE_KEYS.OFFLINE_QUEUE);
   },
 
   resetDefaults(): void {
