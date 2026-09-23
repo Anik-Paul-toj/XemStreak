@@ -32,14 +32,16 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPrompt, setShowPrompt] = useState(true);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isAudioManuallyPaused, setIsAudioManuallyPaused] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const embedInfo = parseYouTubeEmbedInfo(session.youtubeUrl);
 
-  // Sync YouTube audio playback with timer state (pause/resume)
+  // Sync YouTube audio playback with timer state and manual toggle
   useEffect(() => {
     if (!iframeRef.current || !iframeRef.current.contentWindow) return;
-    const command = isRunning ? 'playVideo' : 'pauseVideo';
+    const shouldPlay = isRunning && !isAudioManuallyPaused;
+    const command = shouldPlay ? 'playVideo' : 'pauseVideo';
     try {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ event: 'command', func: command, args: '' }),
@@ -48,7 +50,11 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
     } catch (e) {
       console.warn('YouTube postMessage error:', e);
     }
-  }, [isRunning]);
+  }, [isRunning, isAudioManuallyPaused]);
+
+  const toggleAudioPlayPause = () => {
+    setIsAudioManuallyPaused((prev) => !prev);
+  };
 
   const toggleAudioMute = () => {
     if (!iframeRef.current || !iframeRef.current.contentWindow) return;
@@ -334,15 +340,37 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
                   size={14}
                   color="var(--color-primary)"
                   style={{
-                    animation: isRunning && !isAudioMuted ? 'pulse 2s infinite' : 'none',
+                    animation: isRunning && !isAudioManuallyPaused && !isAudioMuted ? 'pulse 2s infinite' : 'none',
                   }}
                 />
                 <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>
                   {embedInfo.isPlaylist ? 'YouTube Playlist Audio' : 'YouTube Background Audio'}
                 </span>
                 <span style={{ color: 'var(--color-muted)', fontSize: '11px' }}>
-                  • {isRunning ? (isAudioMuted ? 'Muted' : 'Playing') : 'Paused with timer'}
+                  • {!isRunning ? 'Paused with timer' : isAudioManuallyPaused ? 'Music Paused' : isAudioMuted ? 'Muted' : 'Playing'}
                 </span>
+
+                {/* Play/Pause Music Toggle */}
+                <button
+                  type="button"
+                  onClick={toggleAudioPlayPause}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'var(--color-primary)',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    marginLeft: '4px',
+                  }}
+                  title={isAudioManuallyPaused ? 'Play Music' : 'Pause Music'}
+                >
+                  {isAudioManuallyPaused ? <Play size={13} fill="currentColor" /> : <Pause size={13} />}
+                </button>
+
+                {/* Mute/Unmute Toggle */}
                 <button
                   type="button"
                   onClick={toggleAudioMute}
@@ -352,14 +380,13 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    color: isAudioMuted ? 'var(--color-error)' : 'var(--color-primary)',
+                    color: isAudioMuted ? 'var(--color-error)' : 'var(--color-muted)',
                     padding: '2px 4px',
                     borderRadius: '4px',
-                    marginLeft: '2px',
                   }}
                   title={isAudioMuted ? 'Unmute Audio' : 'Mute Audio'}
                 >
-                  {isAudioMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                  {isAudioMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
                 </button>
               </div>
             )}
@@ -444,7 +471,7 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
           ref={iframeRef}
           src={embedInfo.embedSrc}
           title="Background YouTube Audio Stream"
-          allow="autoplay; encrypted-media"
+          allow="autoplay; encrypted-media; fullscreen"
           tabIndex={-1}
           aria-hidden="true"
           style={{
