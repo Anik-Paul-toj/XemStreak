@@ -163,7 +163,15 @@ class ApiClient {
     return this.request('/rooms');
   }
 
-  async createRoom(room: { name: string; description?: string; is_private: boolean; passcode?: string; tags?: string }): Promise<StudyRoom> {
+  async createRoom(room: {
+    id?: string;
+    name: string;
+    description?: string;
+    is_private: boolean;
+    passcode?: string;
+    tags?: string;
+    creator_name?: string;
+  }): Promise<StudyRoom> {
     return this.request('/rooms', {
       method: 'POST',
       body: JSON.stringify(room),

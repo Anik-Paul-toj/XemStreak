@@ -71,11 +71,13 @@ class BatchSyncResponse(BaseModel):
 
 # Study Room schemas
 class CreateRoomRequest(BaseModel):
+    id: Optional[str] = None
     name: str
     description: Optional[str] = None
     is_private: bool = False
     passcode: Optional[str] = None
     tags: Optional[str] = "Deep Work,Focus"
+    creator_name: Optional[str] = None
 
 class RoomMemberSchema(BaseModel):
     id: str

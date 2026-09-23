@@ -294,10 +294,10 @@ def batch_sync(
             DailyProgressModel.date_str == today_str
         ).first()
         if not daily:
-            daily = DailyProgressModel(user_id=user.id, date_str=today_str, seconds_studied=0)
+            daily = DailyProgressModel(user_id=user.id, date_str=today_str, seconds_studied=0, leaves_earned=0)
             db.add(daily)
-        daily.seconds_studied += item.duration_seconds
-        daily.leaves_earned += leaves
+        daily.seconds_studied = (daily.seconds_studied or 0) + item.duration_seconds
+        daily.leaves_earned = (daily.leaves_earned or 0) + leaves
         if daily.seconds_studied >= user.daily_goal_seconds:
             daily.met_goal = True
 
@@ -392,27 +392,40 @@ async def websocket_rooms_endpoint(websocket: WebSocket):
                     user_id = data.get("userId")
                     user = db.query(User).filter(User.id == user_id).first() if user_id else None
                     
-                    room_id = f"room-{int(datetime.datetime.utcnow().timestamp())}"
-                    room = StudyRoomModel(
-                        id=room_id,
-                        name=payload.get("name", "Focus Room"),
-                        description=payload.get("description", ""),
-                        is_private=payload.get("isPrivate", False) or payload.get("is_private", False),
-                        passcode=payload.get("passcode") if (payload.get("isPrivate") or payload.get("is_private")) else None,
-                        tags=payload.get("tags") or "Study,Focus",
-                        total_study_hours=0.0,
-                        creator_id=user_id if user else "user-local",
-                    )
-                    db.add(room)
-                    db.flush()
+                    room_id = payload.get("id") or f"room-{int(datetime.datetime.utcnow().timestamp())}"
+                    
+                    # Check if room already exists
+                    existing = db.query(StudyRoomModel).filter(StudyRoomModel.id == room_id).first()
+                    if not existing:
+                        tags_val = payload.get("tags")
+                        if isinstance(tags_val, list):
+                            tags_val = ",".join(tags_val)
+                        elif not tags_val:
+                            tags_val = "Study,Focus"
+
+                        room = StudyRoomModel(
+                            id=room_id,
+                            name=payload.get("name", "Focus Room"),
+                            description=payload.get("description", ""),
+                            is_private=payload.get("isPrivate", False) or payload.get("is_private", False),
+                            passcode=payload.get("passcode") if (payload.get("isPrivate") or payload.get("is_private")) else None,
+                            tags=tags_val,
+                            total_study_hours=0.0,
+                            creator_id=user.id if user else (user_id or "user-local"),
+                        )
+                        db.add(room)
+                        db.flush()
+
+                        if user:
+                            member = RoomMemberModel(room_id=room.id, user_id=user.id, is_studying=False)
+                            db.add(member)
+                        
+                        db.commit()
+                    else:
+                        room = existing
 
                     creator_name = payload.get("creatorName", user.username if user else "Learner")
                     creator_avatar = user.avatar_bg if user else "#1D8DEA"
-                    
-                    if user:
-                        member = RoomMemberModel(room_id=room.id, user_id=user.id, is_studying=False)
-                        db.add(member)
-                        db.commit()
 
                     tag_list = [t.strip() for t in (room.tags or "").split(",") if t.strip()]
                     room_dict = {
@@ -593,10 +606,26 @@ def get_rooms(db: Session = Depends(get_db)):
 @app.post("/api/rooms", response_model=StudyRoomResponse)
 def create_room(
     req: CreateRoomRequest,
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    room_id = "room-" + str(int(datetime.datetime.utcnow().timestamp()))
+    room_id = req.id or ("room-" + str(int(datetime.datetime.utcnow().timestamp())))
+    
+    # Check if exists
+    existing = db.query(StudyRoomModel).filter(StudyRoomModel.id == room_id).first()
+    if existing:
+        tag_list = [t.strip() for t in (existing.tags or "").split(",") if t.strip()]
+        return StudyRoomResponse(
+            id=existing.id,
+            name=existing.name,
+            description=existing.description,
+            is_private=existing.is_private,
+            passcode=existing.passcode,
+            tags=tag_list,
+            total_study_hours=existing.total_study_hours,
+            members=[]
+        )
+
     room = StudyRoomModel(
         id=room_id,
         name=req.name,
@@ -605,14 +634,19 @@ def create_room(
         passcode=req.passcode if req.is_private else None,
         tags=req.tags or "Study,Focus",
         total_study_hours=0.0,
-        creator_id=user.id,
+        creator_id=user.id if user else "user-local",
     )
     db.add(room)
     db.flush()
 
-    # Add creator as member
-    member = RoomMemberModel(room_id=room.id, user_id=user.id, is_studying=False)
-    db.add(member)
+    creator_id = user.id if user else "user-local"
+    creator_name = user.username if user else (req.creator_name or "Learner")
+    creator_avatar = user.avatar_bg if user else "#1D8DEA"
+
+    # Add creator as member if user exists in DB
+    if user:
+        member = RoomMemberModel(room_id=room.id, user_id=user.id, is_studying=False)
+        db.add(member)
     db.commit()
 
     return StudyRoomResponse(
@@ -621,16 +655,16 @@ def create_room(
         description=room.description,
         is_private=room.is_private,
         passcode=room.passcode,
-        tags=[t.strip() for t in room.tags.split(",") if t.strip()],
+        tags=[t.strip() for t in (room.tags or "").split(",") if t.strip()],
         total_study_hours=0.0,
         members=[
             RoomMemberSchema(
-                id=user.id,
-                name=user.username,
-                avatar_bg=user.avatar_bg,
+                id=creator_id,
+                name=creator_name,
+                avatar_bg=creator_avatar,
                 is_studying=False,
                 today_seconds=0,
-                streak_days=user.streak.current_streak if user.streak else 0,
+                streak_days=user.streak.current_streak if (user and user.streak) else 1,
                 is_current_user=True,
             )
         ]

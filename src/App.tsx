@@ -71,12 +71,17 @@ export function App() {
       const ok = await api.checkHealth();
       setIsBackendConnected(ok);
       if (ok) {
-        // Try fetching updated rooms
+        // Try fetching updated rooms and merge with local rooms
         try {
           const remoteRooms = await api.getRooms();
           if (remoteRooms && remoteRooms.length > 0) {
-            setRooms(remoteRooms);
-            storageService.saveRooms(remoteRooms);
+            setRooms((prev) => {
+              const remoteIds = new Set(remoteRooms.map((r) => r.id));
+              // Preserve remote rooms plus any locally created rooms not yet on remote
+              const merged = [...remoteRooms, ...prev.filter((r) => !remoteIds.has(r.id))];
+              storageService.saveRooms(merged);
+              return merged;
+            });
           }
         } catch {
           // ignore
@@ -382,20 +387,7 @@ export function App() {
   };
 
   const handleCreateRoom = async (newRoom: StudyRoom) => {
-    // 1. Send through WebSocket for instant live broadcast
-    const sentWS = createRoomWS(
-      {
-        name: newRoom.name,
-        description: newRoom.description,
-        isPrivate: newRoom.isPrivate,
-        passcode: newRoom.passcode,
-        tags: newRoom.tags,
-      },
-      profile.id || 'user-local',
-      profile.name
-    );
-
-    // 2. Persist locally
+    // 1. Immediately persist locally so it is never lost
     setRooms((prev) => {
       if (prev.some((r) => r.id === newRoom.id)) return prev;
       const updated = [newRoom, ...prev];
@@ -404,19 +396,34 @@ export function App() {
     });
     handleJoinRoom(newRoom.id);
 
-    // 3. Fallback to REST API if WS not ready
-    if (!sentWS && isBackendConnected) {
-      try {
-        await api.createRoom({
-          name: newRoom.name,
-          description: newRoom.description,
-          is_private: newRoom.isPrivate,
-          passcode: newRoom.passcode,
-          tags: newRoom.tags.join(','),
-        });
-      } catch (err) {
-        console.log('Room synced locally first:', err);
-      }
+    // 2. Broadcast through WebSocket for instant live room sharing
+    createRoomWS(
+      {
+        id: newRoom.id,
+        name: newRoom.name,
+        description: newRoom.description,
+        isPrivate: newRoom.isPrivate,
+        passcode: newRoom.passcode,
+        tags: newRoom.tags,
+        creatorName: profile.name,
+      },
+      profile.id || 'user-local',
+      profile.name
+    );
+
+    // 3. Persist to backend database (SQLite)
+    try {
+      await api.createRoom({
+        id: newRoom.id,
+        name: newRoom.name,
+        description: newRoom.description,
+        is_private: newRoom.isPrivate,
+        passcode: newRoom.passcode,
+        tags: newRoom.tags.join(','),
+        creator_name: profile.name,
+      });
+    } catch (err) {
+      console.log('Room saved locally in offline-first storage:', err);
     }
   };
 
