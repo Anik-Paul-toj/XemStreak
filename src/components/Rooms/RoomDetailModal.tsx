@@ -28,12 +28,12 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
   currentUserTodaySeconds = 6120,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
-  const [, setTick] = useState(0);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   // Live ticker for studying members' timers
   useEffect(() => {
     if (!isOpen || !room) return;
-    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [isOpen, room]);
 
@@ -48,7 +48,7 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
 
   const formatLiveDuration = (startedAt?: number) => {
     if (!startedAt) return '00:00:00';
-    const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    const elapsed = Math.max(0, Math.floor((currentTime - startedAt) / 1000));
     const hours = Math.floor(elapsed / 3600);
     const mins = Math.floor((elapsed % 3600) / 60);
     const secs = elapsed % 60;
@@ -252,7 +252,7 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
                               className="body-sm"
                               style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-success)' }}
                             >
-                              🟢 Studying ({formatLiveDuration(member.liveStudyStartedAt || Date.now() - 1800000)})
+                              🟢 Studying ({formatLiveDuration(member.liveStudyStartedAt || currentTime - 1800000)})
                             </span>
                           </>
                         ) : (

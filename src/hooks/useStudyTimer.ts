@@ -16,14 +16,14 @@ export function useStudyTimer(onSessionCompleted?: (summary: CompletedSessionSum
   const [session, setSession] = useState<StudySession | null>(() => storageService.getActiveSession());
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => calculateCurrentElapsed(session));
   const callbackRef = useRef(onSessionCompleted);
-  callbackRef.current = onSessionCompleted;
+
+  useEffect(() => {
+    callbackRef.current = onSessionCompleted;
+  }, [onSessionCompleted]);
 
   // Sync elapsed seconds via timestamp-based tick
   useEffect(() => {
     if (!session || !session.isRunning) {
-      if (session) {
-        setElapsedSeconds(session.accumulatedSeconds);
-      }
       return;
     }
 
@@ -33,8 +33,6 @@ export function useStudyTimer(onSessionCompleted?: (summary: CompletedSessionSum
 
       // Check if target completed for fixed focus sessions
       if (session.targetSeconds > 0 && current >= session.targetSeconds) {
-        // We can either auto-complete or let the user complete
-        // Updating title to show completion
         document.title = `[Done!] ${session.title} • XemStreak`;
       } else {
         const mins = Math.floor(current / 60);

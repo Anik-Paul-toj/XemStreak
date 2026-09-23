@@ -298,9 +298,6 @@ function generateDefaultWeekHistory(dailyGoalSeconds: number): StreakData['weekH
     } else if (idx === todayIndex) {
       // Friday: 1h 42m (6120 seconds) matching prompt example
       seconds = 6120;
-    } else {
-      // Upcoming weekend days
-      seconds = 0;
     }
     return {
       dayName: day,
