@@ -15,7 +15,10 @@ import {
   LogIn,
   UserPlus
 } from 'lucide-react';
+import type { SpriteStageLevel } from '../../types';
 import { Button } from '../UI/Button';
+import { TreeDisplay } from '../Tree/TreeDisplay';
+import { TreeEvolutionModal } from '../Tree/TreeEvolutionModal';
 
 export interface LandingPageProps {
   onOpenAuth: (mode: 'login' | 'signup') => void;
@@ -27,6 +30,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenAuth,
 }) => {
   const [previewStage, setPreviewStage] = useState<number>(7); // Stage 7: Blooming Sapling
+  const [isTreeModalOpen, setIsTreeModalOpen] = useState(false);
 
   const stagesPreview = [
     { level: 1, name: 'Seed', icon: '🌰', desc: 'Plant your focus habit with 1st session.' },
@@ -137,20 +141,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               Features
             </a>
-            <a
-              href="#tree-engine"
+            <button
+              onClick={() => setIsTreeModalOpen(true)}
               style={{
+                background: 'none',
+                border: 'none',
                 color: 'var(--color-muted)',
-                textDecoration: 'none',
                 fontSize: '14px',
                 fontWeight: 600,
+                cursor: 'pointer',
                 transition: 'color 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '0',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-primary)')}
               onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-muted)')}
+              title="Click to view all 22 evolution stages"
             >
-              22-Stage Tree
-            </a>
+              <span>22-Stage Tree</span>
+              <span
+                style={{
+                  fontSize: '10px',
+                  padding: '1px 6px',
+                  borderRadius: 'var(--rounded-full)',
+                  backgroundColor: 'var(--color-primary-light)',
+                  color: 'var(--color-primary)',
+                  fontWeight: 700,
+                }}
+              >
+                Explorer
+              </span>
+            </button>
             <a
               href="#study-rooms"
               style={{
@@ -455,6 +478,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             {/* Tree Showcase Visual */}
             <div
+              onClick={() => setIsTreeModalOpen(true)}
               style={{
                 position: 'relative',
                 height: '240px',
@@ -466,31 +490,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
+                cursor: 'pointer',
               }}
+              title="Click to explore all 22 stages in detail"
             >
-              {/* Floating Leaves Animation Background */}
-              <div style={{ fontSize: '80px', filter: 'drop-shadow(0 10px 16px rgba(0,0,0,0.15))' }}>
-                {previewStage <= 3 ? '🌱' : previewStage <= 8 ? '🌿' : previewStage <= 15 ? '🌳' : '✨🌳✨'}
-              </div>
+              <TreeDisplay
+                level={previewStage as SpriteStageLevel}
+                size="md"
+                showDetails={false}
+                state="active_studying"
+              />
 
               {/* Tree Stage Badge */}
               <div
                 style={{
-                  marginTop: '12px',
+                  marginTop: '8px',
                   backgroundColor: 'rgba(255, 255, 255, 0.92)',
-                  padding: '6px 14px',
+                  padding: '5px 12px',
                   borderRadius: 'var(--rounded-full)',
                   boxShadow: 'var(--shadow-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
+                  zIndex: 2,
                 }}
               >
                 <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)' }}>
                   Level {previewStage} / 22
                 </span>
-                <span style={{ fontSize: '12px', color: 'var(--color-muted)', fontWeight: 600 }}>
-                  {previewStage <= 3 ? 'Seedling Phase' : previewStage <= 8 ? 'Flourishing Sapling' : 'Master Canopy'}
+                <span style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700 }}>
+                  Click to Explore 22 Stages ✨
                 </span>
               </div>
             </div>
@@ -1185,6 +1214,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </div>
       </footer>
+
+      {/* 22-Stage Botanical Evolution Explorer Modal */}
+      <TreeEvolutionModal
+        isOpen={isTreeModalOpen}
+        onClose={() => setIsTreeModalOpen(false)}
+        onGetStarted={() => onOpenAuth('signup')}
+        initialLevel={previewStage as SpriteStageLevel}
+      />
     </div>
   );
 };
