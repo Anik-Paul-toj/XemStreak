@@ -52,6 +52,7 @@ export interface StudySession {
   pausedAt: number | null; // timestamp when paused or null if running
   isRunning: boolean;
   roomId?: string; // Optional study room ID
+  youtubeUrl?: string; // Optional YouTube playlist / video audio URL
 }
 
 export interface CompletedSessionSummary {

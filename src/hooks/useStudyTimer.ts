@@ -55,7 +55,8 @@ export function useStudyTimer(onSessionCompleted?: (summary: CompletedSessionSum
     mode: SessionMode,
     title: string,
     targetMinutes: number,
-    roomId?: string
+    roomId?: string,
+    youtubeUrl?: string
   ) => {
     const newSession: StudySession = {
       id: 'session-' + Date.now(),
@@ -67,6 +68,7 @@ export function useStudyTimer(onSessionCompleted?: (summary: CompletedSessionSum
       pausedAt: null,
       isRunning: true,
       roomId,
+      youtubeUrl: youtubeUrl?.trim() || undefined,
     };
 
     storageService.saveActiveSession(newSession);

@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { UserProfile, StreakData } from '../../types';
 import { Button } from '../UI/Button';
-import { Flame, Play, ShieldCheck, TreePine, BarChart2, Compass, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react';
+import { Flame, Play, TreePine, BarChart2, Compass, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react';
 
 export interface NavbarProps {
   profile: UserProfile;
   streakData: StreakData;
   onStartStudy: () => void;
   onOpenMilestones: () => void;
-  onToggleGhostMode: () => void;
   onOpenGardenSpace: () => void;
   onOpenAnalytics: () => void;
   onOpenAuth: (mode?: 'login' | 'signup') => void;
@@ -21,7 +20,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   streakData,
   onStartStudy,
   onOpenMilestones,
-  onToggleGhostMode,
   onOpenGardenSpace,
   onOpenAnalytics,
   onOpenAuth,
@@ -164,27 +162,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Analytics</span>
           </button>
 
-          {/* Ghost Mode Toggle */}
-          <button
-            onClick={onToggleGhostMode}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              backgroundColor: profile.ghostMode ? '#FEF3C7' : 'var(--color-surface)',
-              color: profile.ghostMode ? '#B45309' : 'var(--color-muted)',
-              border: '1px solid var(--color-border)',
-              padding: '5px 10px',
-              borderRadius: 'var(--rounded-full)',
-              cursor: 'pointer',
-              fontSize: '11px',
-              fontWeight: 600,
-            }}
-            title={profile.ghostMode ? "Ghost Mode Active: Activity hidden in rooms" : "Click to activate Ghost Mode"}
-          >
-            <ShieldCheck size={13} />
-            <span>{profile.ghostMode ? 'Ghost' : 'Incognito'}</span>
-          </button>
 
           {/* Backend Connection Indicator */}
           <div

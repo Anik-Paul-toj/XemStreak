@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import type { StudyRoom } from '../../types';
 import { RoomCard } from './RoomCard';
 import { Button } from '../UI/Button';
-import { Users, Plus, Search, ShieldCheck } from 'lucide-react';
+import { Users, Plus, Search } from 'lucide-react';
 
 export interface RoomsSectionProps {
   rooms: StudyRoom[];
   joinedRoomId?: string;
   onOpenRoom: (room: StudyRoom) => void;
   onCreateRoomClick: () => void;
-  ghostMode: boolean;
-  onToggleGhostMode: () => void;
 }
 
 export const RoomsSection: React.FC<RoomsSectionProps> = ({
@@ -18,8 +16,6 @@ export const RoomsSection: React.FC<RoomsSectionProps> = ({
   joinedRoomId,
   onOpenRoom,
   onCreateRoomClick,
-  ghostMode,
-  onToggleGhostMode,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'public' | 'private' | 'joined'>('all');
@@ -85,23 +81,6 @@ export const RoomsSection: React.FC<RoomsSectionProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Ghost Mode Privacy Toggle */}
-            <button
-              onClick={onToggleGhostMode}
-              className="xem-button-secondary"
-              style={{
-                height: '44px',
-                padding: '8px 14px',
-                fontSize: '13px',
-                backgroundColor: ghostMode ? '#FEF3C7' : 'var(--color-neutral)',
-                borderColor: ghostMode ? '#FDE68A' : 'var(--color-border)',
-                color: ghostMode ? '#B45309' : 'var(--color-muted)',
-              }}
-              title="Ghost Mode hides your live study status inside rooms"
-            >
-              <ShieldCheck size={16} />
-              <span>{ghostMode ? 'Ghost Mode: On' : 'Incognito Mode'}</span>
-            </button>
 
             <Button
               variant="primary"

@@ -722,11 +722,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <Users size={26} />
               </div>
               <h3 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-secondary)', marginBottom: '10px' }}>
-                Real-Time Study Halls & Ghost Mode
+                Real-Time Collaborative Study Halls
               </h3>
               <p style={{ fontSize: '14px', lineHeight: 1.6, color: 'var(--color-muted)' }}>
                 Create public or passcode-protected study rooms. See active peers timer-sync live,
-                send cheer boosts, or toggle <strong>Ghost Mode (Incognito)</strong> for complete privacy.
+                celebrate daily milestones together, and send cheer boosts to keep momentum high.
               </p>
             </div>
 

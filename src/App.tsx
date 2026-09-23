@@ -243,12 +243,6 @@ export function App() {
   const formattedToday = `${todayHours > 0 ? `${todayHours}h ` : ''}${todayMins}m`;
   const formattedGoal = `${goalHours > 0 ? `${goalHours}h ` : ''}${goalMins > 0 ? `${goalMins}m` : ''}`;
 
-  // Ghost Mode Toggle
-  const handleToggleGhostMode = () => {
-    const updated = { ...profile, ghostMode: !profile.ghostMode };
-    setProfile(updated);
-    storageService.saveProfile(updated);
-  };
 
   // Milestone cosmetic equipping
   const handleEquipItem = (type: 'pot' | 'flora' | 'aura', itemId: string) => {
@@ -383,7 +377,6 @@ export function App() {
         streakData={streakData}
         onStartStudy={() => setIsStudyModalOpen(true)}
         onOpenMilestones={() => setIsMilestonesModalOpen(true)}
-        onToggleGhostMode={handleToggleGhostMode}
         onOpenGardenSpace={() => setIsGardenModalOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
         onOpenAuth={(mode) => {
@@ -602,8 +595,6 @@ export function App() {
           joinedRoomId={profile.joinedRoomId}
           onOpenRoom={handleOpenRoom}
           onCreateRoomClick={() => setIsCreateRoomOpen(true)}
-          ghostMode={profile.ghostMode}
-          onToggleGhostMode={handleToggleGhostMode}
         />
       </main>
 
@@ -659,7 +650,7 @@ export function App() {
           setSelectedRoom(null);
           timer.startSession('focus', `Deep Work @ ${room.name}`, 50, room.id);
         }}
-        isUserStudyingNow={timer.isRunning && !profile.ghostMode}
+        isUserStudyingNow={timer.isRunning}
         currentUserTodaySeconds={streakData.todayStudySeconds}
       />
 
