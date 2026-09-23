@@ -12,6 +12,7 @@ import type {
 } from './types';
 import { storageService, calculateTreeStage, calculateSpriteStage } from './services/storage';
 import { useStudyTimer } from './hooks/useStudyTimer';
+import { useRoomsWebSocket } from './hooks/useRoomsWebSocket';
 import { api } from './services/api';
 import { syncManager } from './services/syncQueue';
 
@@ -129,6 +130,64 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Real-time WebSocket Room Sync
+  const {
+    createRoomWS,
+    joinRoomWS,
+    startStudyWS,
+    stopStudyWS,
+    sendCheerWS,
+  } = useRoomsWebSocket({
+    onRoomCreated: (newRoom) => {
+      setRooms((prev) => {
+        if (prev.some((r) => r.id === newRoom.id)) return prev;
+        const updated = [newRoom, ...prev];
+        storageService.saveRooms(updated);
+        return updated;
+      });
+    },
+    onMemberJoined: ({ roomId, member }) => {
+      setRooms((prev) => {
+        const updated = prev.map((r) => {
+          if (r.id === roomId) {
+            const hasMember = r.members.some((m) => m.id === member.id);
+            if (!hasMember) {
+              return { ...r, members: [...r.members, member] };
+            }
+          }
+          return r;
+        });
+        storageService.saveRooms(updated);
+        return updated;
+      });
+    },
+    onMemberStatusChanged: ({ roomId, userId, isStudying, studyStartedAt, todaySeconds }) => {
+      setRooms((prev) => {
+        const updated = prev.map((r) => {
+          if (r.id === roomId) {
+            return {
+              ...r,
+              members: r.members.map((m) => {
+                if (m.id === userId) {
+                  return {
+                    ...m,
+                    isStudying,
+                    liveStudyStartedAt: studyStartedAt !== undefined ? studyStartedAt : m.liveStudyStartedAt,
+                    todaySeconds: todaySeconds !== undefined ? todaySeconds : m.todaySeconds,
+                  };
+                }
+                return m;
+              }),
+            };
+          }
+          return r;
+        });
+        storageService.saveRooms(updated);
+        return updated;
+      });
+    },
+  });
+
   // Auth Handlers
   const handleAuthSuccess = (newProfile: UserProfile, newStreak: StreakData) => {
     setProfile(newProfile);
@@ -147,8 +206,12 @@ export function App() {
     setAuthModalMode('login');
   };
 
-  // Completed session handler
   const handleSessionFinished = async (summary: CompletedSessionSummary) => {
+    // Notify WebSocket room if studying in a room
+    if (profile.joinedRoomId) {
+      stopStudyWS(profile.joinedRoomId, profile.id || 'user-local', summary.durationSeconds);
+    }
+
     // 1. Sync through offline-first sync manager
     await syncManager.recordSession(summary);
 
@@ -265,25 +328,26 @@ export function App() {
     setProfile(updatedProfile);
     storageService.saveProfile(updatedProfile);
 
+    // WebSocket join broadcast
+    joinRoomWS(roomId, profile.id || 'user-local', profile.name);
+
     setRooms((prev) => {
       const updated = prev.map((r) => {
         if (r.id === roomId) {
-          const alreadyMember = r.members.some((m) => m.id === profile.id);
-          if (!alreadyMember) {
+          const isAlreadyMember = r.members.some((m) => m.id === profile.id);
+          if (!isAlreadyMember) {
+            const newMember = {
+              id: profile.id || 'user-local',
+              name: profile.name,
+              avatarBg: '#1D8DEA',
+              isStudying: false,
+              todaySeconds: streakData.todayStudySeconds,
+              streakDays: streakData.currentStreak,
+              isCurrentUser: true,
+            };
             return {
               ...r,
-              members: [
-                ...r.members,
-                {
-                  id: profile.id,
-                  name: profile.name,
-                  avatarBg: '#1D8DEA',
-                  isStudying: timer.isRunning,
-                  todaySeconds: streakData.todayStudySeconds,
-                  streakDays: streakData.currentStreak,
-                  isCurrentUser: true,
-                },
-              ],
+              members: [...r.members, newMember],
             };
           }
         }
@@ -318,12 +382,30 @@ export function App() {
   };
 
   const handleCreateRoom = async (newRoom: StudyRoom) => {
-    const updated = [newRoom, ...rooms];
-    setRooms(updated);
-    storageService.saveRooms(updated);
+    // 1. Send through WebSocket for instant live broadcast
+    const sentWS = createRoomWS(
+      {
+        name: newRoom.name,
+        description: newRoom.description,
+        isPrivate: newRoom.isPrivate,
+        passcode: newRoom.passcode,
+        tags: newRoom.tags,
+      },
+      profile.id || 'user-local',
+      profile.name
+    );
+
+    // 2. Persist locally
+    setRooms((prev) => {
+      if (prev.some((r) => r.id === newRoom.id)) return prev;
+      const updated = [newRoom, ...prev];
+      storageService.saveRooms(updated);
+      return updated;
+    });
     handleJoinRoom(newRoom.id);
 
-    if (isBackendConnected) {
+    // 3. Fallback to REST API if WS not ready
+    if (!sentWS && isBackendConnected) {
       try {
         await api.createRoom({
           name: newRoom.name,
@@ -646,11 +728,17 @@ export function App() {
         isJoined={selectedRoom?.id === profile.joinedRoomId}
         onJoinRoom={handleJoinRoom}
         onLeaveRoom={handleLeaveRoom}
+        onSendCheer={(reaction) => {
+          if (selectedRoom) {
+            sendCheerWS(selectedRoom.id, profile.name, 'Everyone', reaction);
+          }
+        }}
         onStartStudyInRoom={(room) => {
           setSelectedRoom(null);
+          startStudyWS(room.id, profile.id || 'user-local', profile.ghostMode);
           timer.startSession('focus', `Deep Work @ ${room.name}`, 50, room.id);
         }}
-        isUserStudyingNow={timer.isRunning}
+        isUserStudyingNow={timer.isRunning && !profile.ghostMode}
         currentUserTodaySeconds={streakData.todayStudySeconds}
       />
 

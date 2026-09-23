@@ -13,6 +13,7 @@ export interface RoomDetailModalProps {
   onJoinRoom: (roomId: string) => void;
   onLeaveRoom: (roomId: string) => void;
   onStartStudyInRoom: (room: StudyRoom) => void;
+  onSendCheer?: (reaction: string) => void;
   isUserStudyingNow?: boolean;
   currentUserTodaySeconds?: number;
 }
@@ -25,6 +26,7 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
   onJoinRoom,
   onLeaveRoom,
   onStartStudyInRoom,
+  onSendCheer,
   isUserStudyingNow = false,
   currentUserTodaySeconds = 6120,
 }) => {
@@ -68,12 +70,13 @@ export const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
   };
 
   const handleSendCheer = async (reaction: string, label: string) => {
+    onSendCheer?.(reaction);
     try {
       await api.sendRoomCheer(room.id, reaction);
-      setCheerNotice(`Sent ${reaction} "${label}" to the room!`);
     } catch {
-      setCheerNotice(`Sent ${reaction} "${label}" to the room!`);
+      // Handled via WS or offline
     }
+    setCheerNotice(`Sent ${reaction} "${label}" to the room!`);
     setTimeout(() => setCheerNotice(null), 3000);
   };
 
