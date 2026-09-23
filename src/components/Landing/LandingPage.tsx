@@ -70,10 +70,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           style={{
             maxWidth: '1240px',
             margin: '0 auto',
-            padding: '14px 24px',
+            padding: '12px clamp(12px, 3vw, 24px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            gap: '12px',
           }}
         >
           {/* Logo */}
@@ -121,10 +122,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Desktop Nav Links */}
           <nav
+            className="hide-on-mobile"
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '28px',
+              gap: '24px',
             }}
           >
             <a
@@ -257,7 +259,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section
         style={{
           position: 'relative',
-          padding: '60px 24px 80px',
+          padding: 'clamp(32px, 6vw, 60px) clamp(14px, 3vw, 24px)',
           maxWidth: '1240px',
           margin: '0 auto',
           width: '100%',
@@ -280,13 +282,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         />
 
         <div
+          className="grid-landing-hero"
           style={{
             position: 'relative',
             zIndex: 1,
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '48px',
-            alignItems: 'center',
           }}
         >
           {/* Hero Left Column */}
@@ -315,7 +314,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* Headline */}
             <h1
               style={{
-                fontSize: '46px',
+                fontSize: 'clamp(28px, 5.5vw, 46px)',
                 lineHeight: 1.15,
                 fontWeight: 800,
                 letterSpacing: '-0.03em',
@@ -622,7 +621,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section
         id="features"
         style={{
-          padding: '80px 24px',
+          padding: 'clamp(48px, 8vw, 80px) clamp(14px, 3vw, 24px)',
           backgroundColor: 'var(--color-neutral)',
           borderTop: '1px solid var(--color-border)',
           borderBottom: '1px solid var(--color-border)',
@@ -630,7 +629,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       >
         <div style={{ maxWidth: '1240px', margin: '0 auto', width: '100%' }}>
           {/* Section Heading */}
-          <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 56px' }}>
+          <div style={{ textAlign: 'center', maxWidth: '680px', margin: '0 auto 48px' }}>
             <span
               style={{
                 fontSize: '12px',
@@ -644,7 +643,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </span>
             <h2
               style={{
-                fontSize: '34px',
+                fontSize: 'clamp(24px, 4.5vw, 34px)',
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
                 marginTop: '8px',
@@ -653,18 +652,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               Everything you need to sustain lifelong study momentum
             </h2>
-            <p style={{ fontSize: '16px', color: 'var(--color-muted)', marginTop: '12px', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '15px', color: 'var(--color-muted)', marginTop: '12px', lineHeight: 1.6 }}>
               XemStreak bridges gamification, focus psychology, and social accountability into a frictionless daily workspace.
             </p>
           </div>
 
-          {/* Features 3-Column Grid */}
+          {/* Features Responsive Grid */}
           <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-              gap: '24px',
-            }}
+            className="grid-features-responsive"
           >
             {/* Feature 1: 22-Stage Living Tree */}
             <div
@@ -1031,9 +1026,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           ========================================================================= */}
       <section
         style={{
-          padding: '60px 24px',
+          padding: 'clamp(36px, 6vw, 60px) clamp(14px, 3vw, 24px)',
           maxWidth: '1240px',
-          margin: '0 auto 80px',
+          margin: '0 auto clamp(40px, 6vw, 80px)',
           width: '100%',
         }}
       >
@@ -1041,7 +1036,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           style={{
             background: 'linear-gradient(135deg, #1D8DEA 0%, #1E40AF 100%)',
             borderRadius: 'var(--rounded-xl)',
-            padding: '56px 40px',
+            padding: 'clamp(32px, 5vw, 56px) clamp(18px, 4vw, 40px)',
             color: '#FFFFFF',
             textAlign: 'center',
             position: 'relative',
@@ -1065,7 +1060,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <h2
             style={{
-              fontSize: '36px',
+              fontSize: 'clamp(22px, 5vw, 36px)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               marginBottom: '14px',

@@ -57,18 +57,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         style={{
           maxWidth: '1240px',
           margin: '0 auto',
-          padding: '12px 24px',
+          padding: 'clamp(8px, 2vw, 12px) clamp(10px, 3vw, 24px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '10px',
         }}
       >
         {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <div
             style={{
-              width: '36px',
-              height: '36px',
+              width: '34px',
+              height: '34px',
               borderRadius: 'var(--rounded-md)',
               backgroundColor: 'var(--color-primary)',
               color: 'var(--color-neutral)',
@@ -78,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               boxShadow: '0 4px 12px rgba(29, 141, 234, 0.3)',
             }}
           >
-            <TreePine size={20} />
+            <TreePine size={18} />
           </div>
 
           <div>
@@ -86,7 +87,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span
                 style={{
                   fontFamily: 'var(--font-family-base)',
-                  fontSize: '18px',
+                  fontSize: '17px',
                   fontWeight: 800,
                   letterSpacing: '-0.02em',
                   color: 'var(--color-secondary)',
@@ -99,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Center Navigation Links & Quick Indicators */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="responsive-nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 1 }}>
           {/* Streak pill */}
           <button
             onClick={onOpenMilestones}

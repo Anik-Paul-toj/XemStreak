@@ -401,15 +401,13 @@ export function App() {
           maxWidth: '1240px',
           width: '100%',
           margin: '0 auto',
-          padding: '32px 24px',
+          padding: 'clamp(16px, 4vw, 32px) clamp(12px, 3vw, 24px)',
         }}
       >
         {/* Section 5: Main User Experience Hero */}
         <section
+          className="grid-2col-responsive"
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)',
-            gap: '32px',
             alignItems: 'center',
             marginBottom: '36px',
           }}
@@ -504,13 +502,13 @@ export function App() {
             </Card>
 
             {/* Main Action CTAs */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <Button
                 variant="primary"
                 size="lg"
                 icon={<Play size={20} fill="currentColor" />}
                 onClick={() => setIsStudyModalOpen(true)}
-                style={{ flex: 1.5 }}
+                style={{ flex: '1 1 180px' }}
               >
                 Start Studying
               </Button>
@@ -520,7 +518,7 @@ export function App() {
                 size="lg"
                 icon={<Bot size={18} />}
                 onClick={() => setIsAIDrawerOpen(true)}
-                style={{ flex: 1 }}
+                style={{ flex: '1 1 140px' }}
               >
                 AI Companion
               </Button>
@@ -530,7 +528,7 @@ export function App() {
                 size="lg"
                 icon={<Compass size={18} />}
                 onClick={() => setIsGardenModalOpen(true)}
-                style={{ flex: 1 }}
+                style={{ flex: '1 1 140px' }}
               >
                 Sanctuary
               </Button>
@@ -556,10 +554,8 @@ export function App() {
         {/* Section 10 & 11: KPI Tiles and Week Checklist */}
         <section style={{ marginBottom: '36px' }}>
           <div
+            className="grid-stats-responsive"
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '16px',
               marginBottom: '20px',
             }}
           >

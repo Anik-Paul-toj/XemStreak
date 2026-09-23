@@ -377,3 +377,112 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #A3C5F5;
 }
+
+/* ==========================================================================
+   MOBILE & RESPONSIVE DESIGN SYSTEM
+   ========================================================================== */
+
+/* Responsive Grids */
+.grid-2col-responsive {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 32px;
+}
+
+.grid-landing-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.grid-modal-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.grid-stats-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.grid-features-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.responsive-nav-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.responsive-nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .grid-2col-responsive,
+  .grid-landing-hero {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+  }
+
+  .grid-modal-split {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .headline-display {
+    font-size: 30px !important;
+  }
+  .headline-lg {
+    font-size: 24px !important;
+  }
+  .headline-md {
+    font-size: 20px !important;
+  }
+  
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .show-on-mobile {
+    display: block !important;
+  }
+
+  .grid-stats-responsive {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .grid-features-responsive {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .mobile-stack {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .mobile-wrap {
+    flex-wrap: wrap !important;
+  }
+
+  .mobile-padding {
+    padding: 16px 12px !important;
+  }
+
+  .mobile-full-width {
+    width: 100% !important;
+  }
+}
+

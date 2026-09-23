@@ -190,11 +190,9 @@ export const TreeEvolutionModal: React.FC<TreeEvolutionModalProps> = ({
 
         {/* Modal Main Content: Split Grid */}
         <div
+          className="grid-modal-split"
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)',
-            gap: '24px',
-            padding: '24px',
+            padding: 'clamp(14px, 3vw, 24px)',
             overflowY: 'auto',
           }}
         >
