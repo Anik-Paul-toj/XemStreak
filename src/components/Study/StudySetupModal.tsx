@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
 import type { SessionMode, StudyRoom } from '../../types';
-import { Play, Clock, Sparkles, Target } from 'lucide-react';
+import { Play, Clock, Sparkles, Target, Music, Volume2 } from 'lucide-react';
+import { YOUTUBE_AUDIO_PRESETS } from '../../utils/youtube';
 
 export interface StudySetupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStart: (mode: SessionMode, title: string, durationMinutes: number, roomId?: string) => void;
+  onStart: (mode: SessionMode, title: string, durationMinutes: number, roomId?: string, youtubeUrl?: string) => void;
   joinedRoom?: StudyRoom | null;
 }
 
@@ -22,6 +23,10 @@ export const StudySetupModal: React.FC<StudySetupModalProps> = ({
   const [customMinutes, setCustomMinutes] = useState<string>('45');
   const [title, setTitle] = useState<string>('');
   const [linkToRoom, setLinkToRoom] = useState<boolean>(!!joinedRoom);
+
+  // Background Audio State
+  const [selectedAudioPreset, setSelectedAudioPreset] = useState<string>('none');
+  const [customYoutubeUrl, setCustomYoutubeUrl] = useState<string>('');
 
   const presets = [
     { label: '25m', sub: 'Pomodoro', value: 25 },
@@ -43,11 +48,22 @@ export const StudySetupModal: React.FC<StudySetupModalProps> = ({
       mode === 'goal' ? (title.trim() || 'Goal-based Session') :
       'Free Study Session';
 
+    let resolvedYoutubeUrl: string | undefined = undefined;
+    if (selectedAudioPreset === 'custom') {
+      resolvedYoutubeUrl = customYoutubeUrl.trim() || undefined;
+    } else if (selectedAudioPreset !== 'none') {
+      const presetObj = YOUTUBE_AUDIO_PRESETS.find((p) => p.id === selectedAudioPreset);
+      if (presetObj) {
+        resolvedYoutubeUrl = presetObj.url;
+      }
+    }
+
     onStart(
       mode,
       title.trim() || defaultTitle,
       finalMinutes,
-      linkToRoom && joinedRoom ? joinedRoom.id : undefined
+      linkToRoom && joinedRoom ? joinedRoom.id : undefined,
+      resolvedYoutubeUrl
     );
     onClose();
   };
@@ -293,7 +309,143 @@ export const StudySetupModal: React.FC<StudySetupModalProps> = ({
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Background YouTube Audio Section */}
+        <div
+          style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--rounded-lg)',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Music size={16} color="var(--color-primary)" />
+              <label className="label-sm" style={{ color: 'var(--color-secondary)', margin: 0, fontWeight: 700 }}>
+                BACKGROUND AUDIO (YOUTUBE)
+              </label>
+            </div>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: selectedAudioPreset !== 'none' ? 'var(--color-success)' : 'var(--color-muted)',
+                backgroundColor: selectedAudioPreset !== 'none' ? '#E8F8F0' : 'transparent',
+                padding: '2px 8px',
+                borderRadius: 'var(--rounded-full)',
+              }}
+            >
+              {selectedAudioPreset !== 'none' ? 'Audio Enabled' : 'Off'}
+            </span>
+          </div>
+
+          <p style={{ fontSize: '12px', color: 'var(--color-muted)', margin: 0, lineHeight: 1.4 }}>
+            Plays audio seamlessly in the background (no video distraction). Only plays while the session is active.
+          </p>
+
+          {/* Preset Buttons Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setSelectedAudioPreset('none')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 10px',
+                borderRadius: 'var(--rounded-md)',
+                border: `1.5px solid ${selectedAudioPreset === 'none' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                backgroundColor: selectedAudioPreset === 'none' ? 'var(--color-primary-light)' : 'var(--color-neutral)',
+                color: selectedAudioPreset === 'none' ? 'var(--color-primary)' : 'var(--color-muted)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span>🚫</span>
+              <span>No Audio</span>
+            </button>
+
+            {YOUTUBE_AUDIO_PRESETS.map((preset) => {
+              const isSelected = selectedAudioPreset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setSelectedAudioPreset(preset.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--rounded-md)',
+                    border: `1.5px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                    backgroundColor: isSelected ? 'var(--color-primary-light)' : 'var(--color-neutral)',
+                    color: isSelected ? 'var(--color-primary)' : 'var(--color-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    textAlign: 'left',
+                  }}
+                  title={preset.description}
+                >
+                  <span>{preset.icon}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {preset.title}
+                  </span>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setSelectedAudioPreset('custom')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 10px',
+                borderRadius: 'var(--rounded-md)',
+                border: `1.5px solid ${selectedAudioPreset === 'custom' ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                backgroundColor: selectedAudioPreset === 'custom' ? 'var(--color-primary-light)' : 'var(--color-neutral)',
+                color: selectedAudioPreset === 'custom' ? 'var(--color-primary)' : 'var(--color-secondary)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Volume2 size={13} />
+              <span>Custom Link</span>
+            </button>
+          </div>
+
+          {/* Custom YouTube URL input */}
+          {selectedAudioPreset === 'custom' && (
+            <div style={{ marginTop: '4px', animation: 'fadeIn 0.2s ease-out' }}>
+              <label className="body-sm" style={{ color: 'var(--color-secondary)', fontWeight: 600, marginBottom: '6px', display: 'block', fontSize: '12px' }}>
+                YouTube Playlist or Video URL:
+              </label>
+              <input
+                type="text"
+                value={customYoutubeUrl}
+                onChange={(e) => setCustomYoutubeUrl(e.target.value)}
+                placeholder="e.g. https://www.youtube.com/playlist?list=... or video link"
+                className="xem-input"
+                style={{ fontSize: '13px', height: '38px' }}
+                autoFocus
+              />
+              <span style={{ fontSize: '11px', color: 'var(--color-muted)', marginTop: '4px', display: 'block' }}>
+                💡 Tip: Public YouTube playlists and live lofi streams work best.
+              </span>
+            </div>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
           <Button variant="secondary" onClick={onClose} style={{ flex: 1 }}>
             Cancel

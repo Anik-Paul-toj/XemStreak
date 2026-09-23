@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { StudySession, TreeStage, TreeCustomization } from '../../types';
 import { TreeDisplay } from '../Tree/TreeDisplay';
 import { Button } from '../UI/Button';
 import { ProgressBar } from '../UI/ProgressBar';
-import { Play, Pause, CheckCircle2, X, Maximize2, Minimize2, Sparkles } from 'lucide-react';
+import { Play, Pause, CheckCircle2, X, Maximize2, Minimize2, Sparkles, Music, Volume2, VolumeX } from 'lucide-react';
+import { parseYouTubeEmbedInfo } from '../../utils/youtube';
 
 export interface ActiveStudySessionProps {
   session: StudySession;
@@ -30,6 +31,39 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPrompt, setShowPrompt] = useState(true);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const embedInfo = parseYouTubeEmbedInfo(session.youtubeUrl);
+
+  // Sync YouTube audio playback with timer state (pause/resume)
+  useEffect(() => {
+    if (!iframeRef.current || !iframeRef.current.contentWindow) return;
+    const command = isRunning ? 'playVideo' : 'pauseVideo';
+    try {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: command, args: '' }),
+        '*'
+      );
+    } catch (e) {
+      console.warn('YouTube postMessage error:', e);
+    }
+  }, [isRunning]);
+
+  const toggleAudioMute = () => {
+    if (!iframeRef.current || !iframeRef.current.contentWindow) return;
+    const nextMuted = !isAudioMuted;
+    setIsAudioMuted(nextMuted);
+    const command = nextMuted ? 'mute' : 'unMute';
+    try {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: command, args: '' }),
+        '*'
+      );
+    } catch (e) {
+      console.warn('YouTube postMessage mute error:', e);
+    }
+  };
 
   // Monitor fullscreen change events
   useEffect(() => {
@@ -274,10 +308,61 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
             {session.title}
           </h2>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '6px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
             <span className="body-sm" style={{ color: 'var(--color-muted)' }}>
               🍃 +{leavesAccrued} {leavesAccrued === 1 ? 'leaf' : 'leaves'} grown this session
             </span>
+
+            {/* Background Audio Badge / Controls */}
+            {embedInfo && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: 'var(--color-neutral)',
+                  border: '1px solid var(--color-border)',
+                  padding: '5px 14px',
+                  borderRadius: 'var(--rounded-full)',
+                  boxShadow: 'var(--shadow-subtle)',
+                  fontSize: '12px',
+                  marginTop: '4px',
+                  animation: 'fadeIn 0.3s ease-out',
+                }}
+              >
+                <Music
+                  size={14}
+                  color="var(--color-primary)"
+                  style={{
+                    animation: isRunning && !isAudioMuted ? 'pulse 2s infinite' : 'none',
+                  }}
+                />
+                <span style={{ fontWeight: 600, color: 'var(--color-secondary)' }}>
+                  {embedInfo.isPlaylist ? 'YouTube Playlist Audio' : 'YouTube Background Audio'}
+                </span>
+                <span style={{ color: 'var(--color-muted)', fontSize: '11px' }}>
+                  • {isRunning ? (isAudioMuted ? 'Muted' : 'Playing') : 'Paused with timer'}
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleAudioMute}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: isAudioMuted ? 'var(--color-error)' : 'var(--color-primary)',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    marginLeft: '2px',
+                  }}
+                  title={isAudioMuted ? 'Unmute Audio' : 'Mute Audio'}
+                >
+                  {isAudioMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -352,6 +437,28 @@ export const ActiveStudySession: React.FC<ActiveStudySessionProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Invisible Background YouTube Audio Stream (Plays ONLY while session is active) */}
+      {embedInfo && (
+        <iframe
+          ref={iframeRef}
+          src={embedInfo.embedSrc}
+          title="Background YouTube Audio Stream"
+          allow="autoplay; encrypted-media"
+          tabIndex={-1}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            top: '-5000px',
+            left: '-5000px',
+            width: '1px',
+            height: '1px',
+            opacity: 0.001,
+            pointerEvents: 'none',
+            border: 'none',
+          }}
+        />
+      )}
     </div>
   );
 };
