@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { UserProfile, StreakData } from '../../types';
 import { Button } from '../UI/Button';
-import { Flame, Play, ShieldCheck, TreePine, Bot, BarChart2, Compass, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react';
+import { Flame, Play, ShieldCheck, TreePine, BarChart2, Compass, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react';
 
 export interface NavbarProps {
   profile: UserProfile;
@@ -9,7 +9,6 @@ export interface NavbarProps {
   onStartStudy: () => void;
   onOpenMilestones: () => void;
   onToggleGhostMode: () => void;
-  onOpenAICompanion: () => void;
   onOpenGardenSpace: () => void;
   onOpenAnalytics: () => void;
   onOpenAuth: (mode?: 'login' | 'signup') => void;
@@ -23,7 +22,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onStartStudy,
   onOpenMilestones,
   onToggleGhostMode,
-  onOpenAICompanion,
   onOpenGardenSpace,
   onOpenAnalytics,
   onOpenAuth,
@@ -96,18 +94,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 Xem<span style={{ color: 'var(--color-primary)' }}>Streak</span>
               </span>
-              <span
-                className="xem-chip"
-                style={{
-                  fontSize: '10px',
-                  padding: '1px 6px',
-                  backgroundColor: 'var(--color-primary-light)',
-                  color: 'var(--color-primary)',
-                  fontWeight: 700,
-                }}
-              >
-                PWA
-              </span>
             </div>
           </div>
         </div>
@@ -175,28 +161,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <BarChart2 size={14} />
             <span>Analytics</span>
-          </button>
-
-          {/* AI Study Companion Trigger */}
-          <button
-            onClick={onOpenAICompanion}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: 'var(--color-primary-light)',
-              color: 'var(--color-primary)',
-              border: '1px solid var(--color-border)',
-              padding: '5px 12px',
-              borderRadius: 'var(--rounded-full)',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 700,
-            }}
-            title="Open AI Study Companion"
-          >
-            <Bot size={15} />
-            <span>AI Companion</span>
           </button>
 
           {/* Ghost Mode Toggle */}

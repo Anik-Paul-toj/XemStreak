@@ -32,6 +32,7 @@ import { RoomDetailModal } from './components/Rooms/RoomDetailModal';
 import { CreateRoomModal } from './components/Rooms/CreateRoomModal';
 import { JoinPrivateModal } from './components/Rooms/JoinPrivateModal';
 import { AICompanionDrawer } from './components/AICompanion/AICompanionDrawer';
+import { FloatingAICompanionButton } from './components/AICompanion/FloatingAICompanionButton';
 import { AnalyticsModal } from './components/Analytics/AnalyticsModal';
 import { TreeRoomModal } from './components/PersonalSpace/TreeRoomModal';
 import { AuthModal } from './components/Auth/AuthModal';
@@ -360,7 +361,6 @@ export function App() {
         onStartStudy={() => setIsStudyModalOpen(true)}
         onOpenMilestones={() => setIsMilestonesModalOpen(true)}
         onToggleGhostMode={handleToggleGhostMode}
-        onOpenAICompanion={() => setIsAIDrawerOpen(true)}
         onOpenGardenSpace={() => setIsGardenModalOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
         onOpenAuth={(mode) => {
@@ -668,6 +668,12 @@ export function App() {
         isOpen={isAIDrawerOpen}
         onClose={() => setIsAIDrawerOpen(false)}
         roomName={joinedRoom ? joinedRoom.name : undefined}
+      />
+
+      {/* Floating AI Companion Trigger (Round FAB) */}
+      <FloatingAICompanionButton
+        isOpen={isAIDrawerOpen}
+        onClick={() => setIsAIDrawerOpen(true)}
       />
 
       {/* Analytics Modal (Section 28) */}
