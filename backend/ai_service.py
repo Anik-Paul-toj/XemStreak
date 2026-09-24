@@ -1,9 +1,13 @@
 import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env
+# Load environment variables from backend/.env and root .env
+_backend_dir = Path(__file__).resolve().parent
+load_dotenv(_backend_dir / ".env")
+load_dotenv(_backend_dir.parent / ".env")
 load_dotenv()
 
 class AIProvider(ABC):
@@ -67,9 +71,10 @@ class GroqProvider(AIProvider):
 
         # Candidate models supported by Groq API
         models_to_try = [
-            "openai/gpt-oss-120b",
             "qwen/qwen3.8-27b",
+            "openai/gpt-oss-120b",
             "openai/gpt-oss-20b",
+            "allam-2-7b",
             "llama-3.3-70b-versatile"
         ]
 

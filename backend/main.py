@@ -738,41 +738,54 @@ STAGE_NAMES_22 = [
 @app.post("/api/ai/companion/chat", response_model=AIChatResponse)
 def companion_chat(
     req: AIChatRequest,
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    tree = user.tree or TreeStateModel()
-    streak = user.streak or StreakModel()
-    level = min(22, max(1, tree.stage_level))
-    stage_name = STAGE_NAMES_22[level - 1]
+    if user:
+        tree = user.tree or TreeStateModel()
+        streak = user.streak or StreakModel()
+        level = min(22, max(1, tree.stage_level))
+        stage_name = STAGE_NAMES_22[level - 1]
 
-    today_str = datetime.date.today().isoformat()
-    daily = db.query(DailyProgressModel).filter(
-        DailyProgressModel.user_id == user.id,
-        DailyProgressModel.date_str == today_str
-    ).first()
-    today_minutes = (daily.seconds_studied // 60) if daily else 102
-    goal_minutes = user.daily_goal_seconds // 60
+        today_str = datetime.date.today().isoformat()
+        daily = db.query(DailyProgressModel).filter(
+            DailyProgressModel.user_id == user.id,
+            DailyProgressModel.date_str == today_str
+        ).first()
+        today_minutes = (daily.seconds_studied // 60) if daily else 102
+        goal_minutes = user.daily_goal_seconds // 60
 
-    user_context = {
-        "username": user.username,
-        "streak": streak.current_streak,
-        "today_minutes": today_minutes,
-        "goal_minutes": goal_minutes,
-        "tree_level": level,
-        "tree_name": stage_name,
-        "room_name": req.room_name,
-    }
+        user_context = {
+            "username": user.username,
+            "streak": streak.current_streak,
+            "today_minutes": today_minutes,
+            "goal_minutes": goal_minutes,
+            "tree_level": level,
+            "tree_name": stage_name,
+            "room_name": req.room_name,
+        }
+    else:
+        user_context = {
+            "username": "Guest Scholar",
+            "streak": 5,
+            "today_minutes": 45,
+            "goal_minutes": 120,
+            "tree_level": 4,
+            "tree_name": "Tiny Sprout",
+            "room_name": req.room_name or "Deep Focus",
+        }
 
     result = companion_manager.get_reply(req.message, user_context)
 
-    # Save to history
-    user_msg = AIConversationModel(user_id=user.id, role="user", message=req.message)
-    bot_msg = AIConversationModel(user_id=user.id, role="assistant", message=result["reply"])
-    db.add_all([user_msg, bot_msg])
-    db.commit()
+    # Save to history if logged in
+    if user:
+        user_msg = AIConversationModel(user_id=user.id, role="user", message=req.message)
+        bot_msg = AIConversationModel(user_id=user.id, role="assistant", message=result["reply"])
+        db.add_all([user_msg, bot_msg])
+        db.commit()
 
     return AIChatResponse(
         reply=result["reply"],
         provider=result["provider"]
     )
+
